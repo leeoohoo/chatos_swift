@@ -3,6 +3,7 @@ import SwiftUI
 
 struct UserTurnMessageView: View {
     let turn: ConversationTurn
+    let showsTaskGraph: Bool
     let onOpenProcess: () -> Void
     let onOpenTaskGraph: () -> Void
 
@@ -48,10 +49,6 @@ struct UserTurnMessageView: View {
         !turn.processEvents.isEmpty
     }
 
-    private var showsTaskGraph: Bool {
-        turn.isTaskGraphAvailable
-            && (turn.messageTaskLookup != nil || turn.projectExecutionContext != nil)
-    }
 }
 
 struct AssistantReplyView: View {

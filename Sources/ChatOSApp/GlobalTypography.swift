@@ -26,7 +26,7 @@ struct AppFontSpec {
     static let title = semantic(.title)
     static let title2 = semantic(.title2)
     static let title3 = semantic(.title3)
-    static let headline = semantic(.headline, weight: .semibold)
+    static let headline = semantic(.headline, weight: .medium)
     static let subheadline = semantic(.subheadline)
     static let body = semantic(.body)
     static let callout = semantic(.callout)

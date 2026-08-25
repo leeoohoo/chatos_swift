@@ -17,6 +17,7 @@ final class ConversationSessionViewModel: ObservableObject {
     @Published private(set) var isUpdatingRuntimeSettings = false
     @Published private(set) var planModeEnabled = false
     @Published private(set) var reasoningEnabled = false
+    @Published private(set) var taskGraphAvailability: [String: Bool] = [:]
     @Published var historyError: String?
     @Published var selectedTurnID: String?
     @Published var draft = ""
@@ -33,6 +34,8 @@ final class ConversationSessionViewModel: ObservableObject {
     private var requestGeneration: Int64 = 0
     private var inFlightOlderCursor: String?
     private var realtimeTask: Task<Void, Never>?
+    private var taskGraphAvailabilityTasks: [String: Task<Void, Never>] = [:]
+    private var taskGraphAvailabilityRevisions: [String: Int64] = [:]
 
     init(
         sessionID: String,
@@ -65,6 +68,7 @@ final class ConversationSessionViewModel: ObservableObject {
 
     deinit {
         realtimeTask?.cancel()
+        taskGraphAvailabilityTasks.values.forEach { $0.cancel() }
     }
 
     func refreshLatest() {
@@ -131,6 +135,47 @@ final class ConversationSessionViewModel: ObservableObject {
         Task {
             await historyStore.markNewerContentRead(sessionID: sessionID)
             await refreshSnapshot()
+        }
+    }
+
+    func hasTaskGraph(for turn: ConversationTurn) -> Bool {
+        taskGraphAvailability[turn.id] == true
+    }
+
+    func resolveTaskGraphAvailability(for turn: ConversationTurn) {
+        let isCandidate = turn.isTaskGraphAvailable
+            && (turn.messageTaskLookup != nil || turn.projectExecutionContext != nil)
+        guard isCandidate, let messageTaskGraphService else {
+            taskGraphAvailability[turn.id] = false
+            taskGraphAvailabilityRevisions[turn.id] = turn.revision
+            taskGraphAvailabilityTasks[turn.id]?.cancel()
+            taskGraphAvailabilityTasks[turn.id] = nil
+            return
+        }
+        guard taskGraphAvailabilityRevisions[turn.id] != turn.revision else { return }
+
+        taskGraphAvailabilityRevisions[turn.id] = turn.revision
+        taskGraphAvailability[turn.id] = false
+        taskGraphAvailabilityTasks[turn.id]?.cancel()
+        taskGraphAvailabilityTasks[turn.id] = Task { [weak self] in
+            do {
+                let graph = try await messageTaskGraphService.fetchGraph(
+                    messageID: turn.userMessage.id,
+                    lookup: turn.resolvedMessageTaskLookup
+                )
+                guard !Task.isCancelled,
+                      self?.taskGraphAvailabilityRevisions[turn.id] == turn.revision else {
+                    return
+                }
+                self?.taskGraphAvailability[turn.id] = !graph.nodes.isEmpty
+            } catch {
+                guard !Task.isCancelled,
+                      self?.taskGraphAvailabilityRevisions[turn.id] == turn.revision else {
+                    return
+                }
+                self?.taskGraphAvailability[turn.id] = false
+            }
+            self?.taskGraphAvailabilityTasks[turn.id] = nil
         }
     }
 

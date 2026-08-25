@@ -3,7 +3,7 @@ import ChatOSCore
 import SwiftUI
 
 struct CodePreviewView: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.interfaceFontScale) private var interfaceFontScale
     let content: String
     let fileName: String
     var targetLine: Int?
@@ -31,14 +31,14 @@ struct CodePreviewView: View {
             isEditable: false,
             targetLine: targetLine,
             followsTail: followsTail,
-            fontSize: CodeFontMetrics.fontSize(for: dynamicTypeSize),
+            fontSize: CodeFontMetrics.fontSize(for: interfaceFontScale),
             onSymbolSelection: onSymbolSelection
         )
     }
 }
 
 struct CodeEditorView: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.interfaceFontScale) private var interfaceFontScale
     @Binding var text: String
     let fileName: String
     var targetLine: Int?
@@ -51,7 +51,7 @@ struct CodeEditorView: View {
             isEditable: true,
             targetLine: targetLine,
             followsTail: false,
-            fontSize: CodeFontMetrics.fontSize(for: dynamicTypeSize),
+            fontSize: CodeFontMetrics.fontSize(for: interfaceFontScale),
             onSymbolSelection: onSymbolSelection
         )
     }
@@ -76,6 +76,8 @@ private struct NativeCodeTextView: NSViewRepresentable {
         scrollView.borderType = .noBorder
         scrollView.drawsBackground = true
         scrollView.backgroundColor = .textBackgroundColor
+        scrollView.wantsLayer = true
+        scrollView.layer?.masksToBounds = true
 
         let textView = NSTextView(frame: .zero)
         configure(textView)
@@ -225,8 +227,15 @@ private struct NativeCodeTextView: NSViewRepresentable {
             scrollView.reflectScrolledClipView(scrollView.contentView)
         } else if followsTail {
             textView.scrollToEndOfDocument(nil)
+            let maximumY = max(
+                0,
+                textView.bounds.height - scrollView.contentView.bounds.height
+            )
+            scrollView.contentView.scroll(to: NSPoint(x: 0, y: maximumY))
+            scrollView.reflectScrolledClipView(scrollView.contentView)
         } else {
-            textView.scrollToBeginningOfDocument(nil)
+            scrollView.contentView.scroll(to: .zero)
+            scrollView.reflectScrolledClipView(scrollView.contentView)
         }
     }
 
@@ -498,16 +507,7 @@ private enum CodeSyntaxHighlighter {
 }
 
 private enum CodeFontMetrics {
-    static func fontSize(for size: DynamicTypeSize) -> CGFloat {
-        switch size {
-        case .xSmall: 11
-        case .small: 12
-        case .medium: 13
-        case .large: 14
-        case .xLarge: 15
-        case .xxLarge: 16
-        case .xxxLarge: 17
-        default: 18
-        }
+    static func fontSize(for interfaceScale: CGFloat) -> CGFloat {
+        max(11, 13 * interfaceScale)
     }
 }

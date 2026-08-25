@@ -9,12 +9,15 @@ struct ProjectFileEditorView: View {
         VStack(spacing: 0) {
             if let file = viewModel.selectedFile {
                 header(file)
+                    .background(AppPalette.surface)
+                    .zIndex(1)
                 Divider()
                 if shouldShowCodeNavigation(for: file) {
                     codeNavigationPanel
                     Divider()
                 }
                 content(file)
+                    .clipped()
             } else {
                 ContentUnavailableView("选择一个文件", systemImage: "doc.text.magnifyingglass", description: Text("从左侧项目目录中选择文件以预览或编辑。"))
                     .workspaceFill()
@@ -179,6 +182,7 @@ struct ProjectFileEditorView: View {
                 targetLine: viewModel.selectedLine,
                 onSymbolSelection: viewModel.selectSymbol
             )
+            .clipped()
         } else {
             if ["md", "markdown"].contains(URL(fileURLWithPath: file.name).pathExtension.lowercased()),
                viewModel.selectedLine == nil {
@@ -194,6 +198,7 @@ struct ProjectFileEditorView: View {
                     targetLine: viewModel.selectedLine,
                     onSymbolSelection: viewModel.selectSymbol
                 )
+                .clipped()
             }
         }
     }

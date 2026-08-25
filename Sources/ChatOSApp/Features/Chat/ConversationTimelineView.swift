@@ -82,6 +82,7 @@ struct ConversationTimelineView: View {
                         ForEach(conversation.turns) { turn in
                             TurnView(
                                 turn: turn,
+                                showsTaskGraph: conversation.hasTaskGraph(for: turn),
                                 onOpenProcess: { selectedProcessTurn = turn },
                                 onOpenTaskWorkspace: { selectedTaskTurn = turn },
                                 expandedTaskReply: selectedTaskReply,
@@ -89,6 +90,9 @@ struct ConversationTimelineView: View {
                                 onToggleTaskReply: toggleTaskReply
                             )
                                 .id(turn.id)
+                                .task(id: "\(turn.id):\(turn.revision)") {
+                                    conversation.resolveTaskGraphAvailability(for: turn)
+                                }
                         }
                     }
                     .padding(.horizontal, 28)
@@ -144,6 +148,7 @@ struct ConversationTimelineView: View {
 
 struct TurnView: View {
     let turn: ConversationTurn
+    let showsTaskGraph: Bool
     let onOpenProcess: () -> Void
     let onOpenTaskWorkspace: () -> Void
     let expandedTaskReply: TaskReplySelection?
@@ -158,6 +163,7 @@ struct TurnView: View {
         VStack(alignment: .leading, spacing: 14) {
             UserTurnMessageView(
                 turn: turn,
+                showsTaskGraph: showsTaskGraph,
                 onOpenProcess: onOpenProcess,
                 onOpenTaskGraph: onOpenTaskWorkspace
             )
