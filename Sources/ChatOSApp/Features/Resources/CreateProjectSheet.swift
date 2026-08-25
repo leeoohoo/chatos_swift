@@ -78,27 +78,7 @@ struct CreateProjectSheet: View {
 
     private var form: some View {
         VStack(alignment: .leading, spacing: 16) {
-            if viewModel.workspaces.count > 1 {
-                LabeledContent("本机工作区") {
-                    Picker("本机工作区", selection: $viewModel.selectedWorkspaceID) {
-                        ForEach(viewModel.workspaces) { workspace in
-                            Text(workspace.alias).tag(workspace.id)
-                        }
-                    }
-                    .labelsHidden()
-                    .frame(width: 280)
-                    .onChange(of: viewModel.selectedWorkspaceID) {
-                        Task { await viewModel.selectedWorkspaceChanged() }
-                    }
-                }
-            } else if let workspace = viewModel.selectedWorkspace {
-                LabeledContent("本机工作区") {
-                    HStack(spacing: 7) {
-                        Circle().fill(.green).frame(width: 7, height: 7)
-                        Text(workspace.alias).appFont(.body)
-                    }
-                }
-            } else {
+            if viewModel.selectedWorkspace == nil {
                 Label("本机网关没有提供可用工作区", systemImage: "externaldrive.badge.exclamationmark")
                     .foregroundStyle(.orange)
             }

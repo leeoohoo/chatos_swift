@@ -69,7 +69,7 @@ private struct NativeCodeTextView: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
 
     func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = NSScrollView()
+        let scrollView = CodeScrollView()
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = true
         scrollView.autohidesScrollers = true
@@ -116,6 +116,7 @@ private struct NativeCodeTextView: NSViewRepresentable {
         context.coordinator.parent = self
         textView.isEditable = isEditable
         textView.allowsUndo = isEditable
+        (scrollView as? CodeScrollView)?.synchronizeDocumentFrame()
         let textChanged = textView.string != text
         let presentationChanged = context.coordinator.lastFileName != fileName
             || context.coordinator.lastTargetLine != targetLine
@@ -198,9 +199,7 @@ private struct NativeCodeTextView: NSViewRepresentable {
 
         coordinator.isApplyingText = true
         textView.textStorage?.setAttributedString(attributed)
-        textView.layoutManager?.ensureLayout(for: textView.textContainer!)
-        textView.sizeToFit()
-        textView.frame.origin = .zero
+        (textView.enclosingScrollView as? CodeScrollView)?.synchronizeDocumentFrame()
         if isEditable {
             let validRanges = selectedRanges.compactMap { value -> NSValue? in
                 let range = value.rangeValue
@@ -214,6 +213,7 @@ private struct NativeCodeTextView: NSViewRepresentable {
         }
         coordinator.isApplyingText = false
         coordinator.ruler?.update(text: attributed.string, fontSize: fontSize)
+        (textView.enclosingScrollView as? CodeScrollView)?.synchronizeDocumentFrame()
         if preservingViewport, let viewportOrigin, let scrollView {
             scrollView.contentView.scroll(to: viewportOrigin)
             scrollView.reflectScrolledClipView(scrollView.contentView)
@@ -263,6 +263,7 @@ private struct NativeCodeTextView: NSViewRepresentable {
         targetLine: Int?,
         followsTail: Bool
     ) {
+        let leadingX = -(scrollView.verticalRulerView?.requiredThickness ?? 0)
         if let targetLine,
            !textView.string.isEmpty,
            let characterLocation = lineStart(targetLine, in: textView.string),
@@ -272,7 +273,7 @@ private struct NativeCodeTextView: NSViewRepresentable {
             var lineRect = layoutManager.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: nil)
             lineRect.origin.y += textView.textContainerInset.height
             let y = max(0, lineRect.midY - scrollView.contentView.bounds.height / 2)
-            scrollView.contentView.scroll(to: NSPoint(x: 0, y: y))
+            scrollView.contentView.scroll(to: NSPoint(x: leadingX, y: y))
             scrollView.reflectScrolledClipView(scrollView.contentView)
         } else if followsTail {
             textView.scrollToEndOfDocument(nil)
@@ -280,10 +281,10 @@ private struct NativeCodeTextView: NSViewRepresentable {
                 0,
                 textView.bounds.height - scrollView.contentView.bounds.height
             )
-            scrollView.contentView.scroll(to: NSPoint(x: 0, y: maximumY))
+            scrollView.contentView.scroll(to: NSPoint(x: leadingX, y: maximumY))
             scrollView.reflectScrolledClipView(scrollView.contentView)
         } else {
-            scrollView.contentView.scroll(to: .zero)
+            scrollView.contentView.scroll(to: NSPoint(x: leadingX, y: 0))
             scrollView.reflectScrolledClipView(scrollView.contentView)
         }
     }
@@ -368,6 +369,40 @@ private struct NativeCodeTextView: NSViewRepresentable {
         private static func isIdentifierCodeUnit(_ value: unichar) -> Bool {
             guard let scalar = UnicodeScalar(value) else { return false }
             return CharacterSet.alphanumerics.contains(scalar) || value == 95 || value == 36
+        }
+    }
+}
+
+private final class CodeScrollView: NSScrollView {
+    private var isSynchronizingDocumentFrame = false
+
+    override func layout() {
+        super.layout()
+        synchronizeDocumentFrame()
+    }
+
+    func synchronizeDocumentFrame() {
+        guard !isSynchronizingDocumentFrame,
+              let textView = documentView as? NSTextView,
+              let layoutManager = textView.layoutManager,
+              let textContainer = textView.textContainer else { return }
+        isSynchronizingDocumentFrame = true
+        defer { isSynchronizingDocumentFrame = false }
+
+        layoutManager.ensureLayout(for: textContainer)
+        let usedRect = layoutManager.usedRect(for: textContainer)
+        let inset = textView.textContainerInset
+        let viewport = contentView.bounds.size
+        let size = NSSize(
+            width: max(viewport.width, ceil(usedRect.maxX + inset.width * 2)),
+            height: max(viewport.height, ceil(usedRect.maxY + inset.height * 2))
+        )
+        if abs(textView.frame.width - size.width) > 0.5
+            || abs(textView.frame.height - size.height) > 0.5 {
+            textView.setFrameSize(size)
+        }
+        if textView.frame.origin != .zero {
+            textView.setFrameOrigin(.zero)
         }
     }
 }

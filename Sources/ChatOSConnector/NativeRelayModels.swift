@@ -104,15 +104,21 @@ enum NativeJSONValue: Codable, Sendable, Equatable {
         case let .number(value):
             value.rounded() == value ? String(Int64(value)) : String(value)
         case let .string(value):
-            String(data: try! JSONEncoder().encode(value), encoding: .utf8) ?? "\"\""
+            Self.canonicalJSONString(value)
         case let .array(values):
             "[" + values.map(\.canonicalJSONString).joined(separator: ",") + "]"
         case let .object(values):
             "{" + values.keys.sorted().map { key in
-                let encodedKey = String(data: try! JSONEncoder().encode(key), encoding: .utf8) ?? "\"\""
+                let encodedKey = Self.canonicalJSONString(key)
                 return encodedKey + ":" + (values[key]?.canonicalJSONString ?? "null")
             }.joined(separator: ",") + "}"
         }
+    }
+
+    private static func canonicalJSONString(_ value: String) -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.withoutEscapingSlashes]
+        return String(data: try! encoder.encode(value), encoding: .utf8) ?? "\"\""
     }
 }
 

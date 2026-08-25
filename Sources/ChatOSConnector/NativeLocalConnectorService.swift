@@ -385,6 +385,10 @@ public actor NativeLocalConnectorService: LocalConnectorControlServicing {
                             Task { [weak self] in
                                 await self?.handleTerminalRelayMessage(data, socket: socket)
                             }
+                        case "mcp":
+                            Task { [weak self] in
+                                await self?.handleMCPRelayMessage(data, socket: socket)
+                            }
                         case "workspace_directory_list_request",
                              "workspace_directory_create_request",
                              "workspace_filesystem_request":

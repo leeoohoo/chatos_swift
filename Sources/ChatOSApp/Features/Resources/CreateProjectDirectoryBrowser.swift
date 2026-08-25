@@ -40,6 +40,14 @@ struct CreateProjectDirectoryBrowser: View {
             Spacer()
 
             Button {
+                viewModel.toggleHiddenDirectories()
+            } label: {
+                Image(systemName: viewModel.showsHiddenDirectories ? "eye" : "eye.slash")
+            }
+            .buttonStyle(.borderless)
+            .help(viewModel.showsHiddenDirectories ? "隐藏隐藏与系统目录" : "显示隐藏与系统目录")
+
+            Button {
                 showingNewFolderPrompt = true
             } label: {
                 Label("新建文件夹", systemImage: "folder.badge.plus")

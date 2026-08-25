@@ -123,7 +123,7 @@ extension NativeLocalConnectorService {
         )
     }
 
-    private func approvalDecision(
+    func approvalDecision(
         requestID: String,
         command: String,
         arguments: [String],
@@ -228,7 +228,7 @@ extension NativeLocalConnectorService {
         }
     }
 
-    private func resolveDirectory(
+    func resolveDirectory(
         _ rawPath: String,
         relativeTo base: URL,
         workspace: LocalConnectorWorkspace
@@ -259,7 +259,7 @@ extension NativeLocalConnectorService {
         return url.path.hasPrefix(prefix) ? String(url.path.dropFirst(prefix.count)) : url.path
     }
 
-    private func appendApprovalHistory(
+    func appendApprovalHistory(
         command: String,
         arguments: [String],
         cwd: String,
@@ -283,7 +283,7 @@ extension NativeLocalConnectorService {
         try? stateStore.save(state)
     }
 
-    private func appendCommandHistory(
+    func appendCommandHistory(
         result: LocalConnectorTerminalResult,
         display: String,
         workspace: LocalConnectorWorkspace,
