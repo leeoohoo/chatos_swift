@@ -101,9 +101,13 @@ private struct NativeCodeTextView: NSViewRepresentable {
         context.coordinator.lastFileName = fileName
         context.coordinator.lastTargetLine = targetLine
         context.coordinator.lastFontSize = fontSize
-        DispatchQueue.main.async {
-            position(textView, in: scrollView, targetLine: targetLine, followsTail: followsTail)
-        }
+        schedulePosition(
+            textView,
+            in: scrollView,
+            targetLine: targetLine,
+            followsTail: followsTail,
+            coordinator: context.coordinator
+        )
         return scrollView
     }
 
@@ -130,7 +134,13 @@ private struct NativeCodeTextView: NSViewRepresentable {
         context.coordinator.lastTargetLine = targetLine
         context.coordinator.lastFontSize = fontSize
         if presentationChanged || followsTail {
-            position(textView, in: scrollView, targetLine: targetLine, followsTail: followsTail)
+            schedulePosition(
+                textView,
+                in: scrollView,
+                targetLine: targetLine,
+                followsTail: followsTail,
+                coordinator: context.coordinator
+            )
         }
     }
 
@@ -188,7 +198,9 @@ private struct NativeCodeTextView: NSViewRepresentable {
 
         coordinator.isApplyingText = true
         textView.textStorage?.setAttributedString(attributed)
+        textView.layoutManager?.ensureLayout(for: textView.textContainer!)
         textView.sizeToFit()
+        textView.frame.origin = .zero
         if isEditable {
             let validRanges = selectedRanges.compactMap { value -> NSValue? in
                 let range = value.rangeValue
@@ -205,6 +217,43 @@ private struct NativeCodeTextView: NSViewRepresentable {
         if preservingViewport, let viewportOrigin, let scrollView {
             scrollView.contentView.scroll(to: viewportOrigin)
             scrollView.reflectScrolledClipView(scrollView.contentView)
+        }
+    }
+
+    private func schedulePosition(
+        _ textView: NSTextView,
+        in scrollView: NSScrollView,
+        targetLine: Int?,
+        followsTail: Bool,
+        coordinator: Coordinator
+    ) {
+        coordinator.positionGeneration += 1
+        let generation = coordinator.positionGeneration
+
+        position(
+            textView,
+            in: scrollView,
+            targetLine: targetLine,
+            followsTail: followsTail
+        )
+
+        // SwiftUI may resize the NSScrollView after updateNSView returns. Reset
+        // the viewport again after AppKit has tiled the ruler and clip view, so
+        // a previous file's horizontal offset cannot hide the first characters.
+        DispatchQueue.main.async { [weak textView, weak scrollView, weak coordinator] in
+            guard let textView,
+                  let scrollView,
+                  let coordinator,
+                  coordinator.positionGeneration == generation else { return }
+            scrollView.needsLayout = true
+            scrollView.layoutSubtreeIfNeeded()
+            scrollView.tile()
+            position(
+                textView,
+                in: scrollView,
+                targetLine: targetLine,
+                followsTail: followsTail
+            )
         }
     }
 
@@ -263,6 +312,7 @@ private struct NativeCodeTextView: NSViewRepresentable {
         var lastFileName = ""
         var lastTargetLine: Int?
         var lastFontSize: CGFloat = 0
+        var positionGeneration = 0
 
         init(parent: NativeCodeTextView) { self.parent = parent }
 
@@ -349,6 +399,8 @@ private final class CodeLineNumberRulerView: NSRulerView {
         lineStarts = starts
         self.fontSize = max(10, fontSize - 2)
         thickness = max(44, CGFloat(max(2, String(starts.count).count)) * 8 + 20)
+        scrollView?.needsLayout = true
+        scrollView?.tile()
         invalidateHashMarks()
         needsDisplay = true
     }

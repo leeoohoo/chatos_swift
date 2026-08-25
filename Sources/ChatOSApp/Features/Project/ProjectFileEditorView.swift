@@ -186,6 +186,7 @@ struct ProjectFileEditorView: View {
                 targetLine: viewModel.selectedLine,
                 onSymbolSelection: viewModel.selectSymbol
             )
+            .id(file.path)
             .clipped()
         } else {
             if ["md", "markdown"].contains(URL(fileURLWithPath: file.name).pathExtension.lowercased()),
@@ -202,6 +203,7 @@ struct ProjectFileEditorView: View {
                     targetLine: viewModel.selectedLine,
                     onSymbolSelection: viewModel.selectSymbol
                 )
+                .id(file.path)
                 .clipped()
             }
         }
