@@ -144,7 +144,7 @@ final class CreateProjectViewModel: ObservableObject {
         isSaving = true
         errorMessage = nil
         do {
-            let project: WorkspaceProject
+            var project: WorkspaceProject
             if let pendingCreatedProject {
                 project = pendingCreatedProject
             } else {
@@ -162,12 +162,16 @@ final class CreateProjectViewModel: ObservableObject {
                 projectID: project.id,
                 contactID: defaultContact.id
             )
+            project.latestConversationID = try await creationService.ensureConversation(
+                project: project,
+                contact: defaultContact
+            )
             pendingCreatedProject = nil
             isSaving = false
             return project
         } catch {
             if pendingCreatedProject != nil {
-                errorMessage = "项目已经创建，但绑定默认联系人“叽咕狸”失败：\(error.localizedDescription)\n请点击“重试绑定”，不会重复创建项目。"
+                errorMessage = "项目已经创建，但准备默认联系人“叽咕狸”的会话失败：\(error.localizedDescription)\n请点击“重试”，不会重复创建项目。"
             } else {
                 errorMessage = error.localizedDescription
             }

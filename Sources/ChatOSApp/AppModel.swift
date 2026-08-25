@@ -35,6 +35,8 @@ final class AppModel: ObservableObject {
     @Published private(set) var remoteConnectionsError: String?
     @Published private(set) var isWorkspaceLoading = false
     @Published private(set) var workspaceError: String?
+    @Published private(set) var preparingProjectConversationIDs: Set<String> = []
+    @Published private(set) var projectConversationPreparationErrors: [String: String] = [:]
 
     let historyStore: ConversationHistoryStore
     let authentication: AuthenticationViewModel
@@ -220,6 +222,8 @@ final class AppModel: ObservableObject {
             conversationCache = [:]
             projectConversation = nil
             contactConversation = nil
+            preparingProjectConversationIDs = []
+            projectConversationPreparationErrors = [:]
         case .restoring, .authenticating:
             break
         }
@@ -258,6 +262,19 @@ final class AppModel: ObservableObject {
         selection = .project(project.id)
         projectTab = .directory
         refreshWorkspace()
+    }
+
+    func isPreparingProjectConversation(projectID: String) -> Bool {
+        preparingProjectConversationIDs.contains(projectID)
+    }
+
+    func projectConversationPreparationError(projectID: String) -> String? {
+        projectConversationPreparationErrors[projectID]
+    }
+
+    func retryProjectConversationPreparation(projectID: String) {
+        projectConversationPreparationErrors[projectID] = nil
+        prepareProjectConversationIfNeeded(projectID: projectID, force: true)
     }
 
     func refreshRemoteConnections() {
@@ -319,6 +336,9 @@ final class AppModel: ObservableObject {
                 conversation(for: $0, allowsPlanMode: true)
             }
             contactConversation = nil
+            if conversationID == nil {
+                prepareProjectConversationIfNeeded(projectID: id)
+            }
         case let .contact(id):
             let conversationID = contacts.first(where: { $0.id == id })?.conversationID
             contactConversation = conversationID.map {
@@ -328,6 +348,56 @@ final class AppModel: ObservableObject {
         default:
             projectConversation = nil
             contactConversation = nil
+        }
+    }
+
+    private func prepareProjectConversationIfNeeded(projectID: String, force: Bool = false) {
+        guard !preparingProjectConversationIDs.contains(projectID) else { return }
+        guard force || projectConversationPreparationErrors[projectID] == nil else { return }
+        guard let project = workspaceProject(id: projectID),
+              let contact = defaultProjectContact else { return }
+
+        preparingProjectConversationIDs.insert(projectID)
+        projectConversationPreparationErrors[projectID] = nil
+        Task {
+            do {
+                let conversationID = try await workspaceResourceCreationService.ensureConversation(
+                    project: project,
+                    contact: contact
+                )
+                applyPreparedConversation(
+                    conversationID,
+                    projectID: projectID,
+                    contactName: contact.name
+                )
+            } catch {
+                projectConversationPreparationErrors[projectID] = error.localizedDescription
+            }
+            preparingProjectConversationIDs.remove(projectID)
+        }
+    }
+
+    private func applyPreparedConversation(
+        _ conversationID: String,
+        projectID: String,
+        contactName: String
+    ) {
+        if let index = workspaceProjects.firstIndex(where: { $0.id == projectID }) {
+            workspaceProjects[index].latestConversationID = conversationID
+        }
+        if let index = projects.firstIndex(where: { $0.id == projectID }) {
+            let existing = projects[index]
+            projects[index] = ResourceItem(
+                id: existing.id,
+                title: existing.title,
+                subtitle: existing.subtitle,
+                conversationID: conversationID,
+                contactName: contactName
+            )
+        }
+        projectConversationPreparationErrors[projectID] = nil
+        if selection == .project(projectID) {
+            projectConversation = conversation(for: conversationID, allowsPlanMode: true)
         }
     }
 

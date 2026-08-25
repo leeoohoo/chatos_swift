@@ -22,4 +22,8 @@ public struct LocalProjectCreationDraft: Sendable, Equatable {
 public protocol WorkspaceResourceCreating: Sendable {
     func createLocalProject(_ draft: LocalProjectCreationDraft) async throws -> WorkspaceProject
     func bindContact(projectID: String, contactID: String) async throws
+    func ensureConversation(
+        project: WorkspaceProject,
+        contact: WorkspaceContact
+    ) async throws -> String
 }

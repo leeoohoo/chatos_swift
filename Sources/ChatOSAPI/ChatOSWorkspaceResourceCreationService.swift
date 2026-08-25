@@ -28,67 +28,48 @@ public struct ChatOSWorkspaceResourceCreationService: WorkspaceResourceCreating 
             body: body
         )
     }
-}
 
-private struct CreateLocalProjectRequest: Encodable {
-    var name: String
-    var deviceID: String
-    var workspaceID: String
-    var relativePath: String?
-
-    init(draft: LocalProjectCreationDraft) {
-        name = draft.name
-        deviceID = draft.deviceID
-        workspaceID = draft.workspaceID
-        relativePath = draft.relativePath
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case name
-        case deviceID = "device_id"
-        case workspaceID = "workspace_id"
-        case relativePath = "relative_path"
-    }
-}
-
-private struct BindContactRequest: Encodable {
-    var contactID: String
-
-    enum CodingKeys: String, CodingKey {
-        case contactID = "contact_id"
-    }
-}
-
-private struct CreatedProjectDTO: Decodable {
-    var id: String
-    var name: String
-    var rootPath: String?
-    var displayRootPath: String?
-    var latestConversationID: String?
-
-    enum CodingKeys: String, CodingKey {
-        case id, name
-        case rootPath = "root_path"
-        case displayRootPath = "display_root_path"
-        case latestConversationID = "latest_session_id"
-    }
-
-    var domainModel: WorkspaceProject {
-        WorkspaceProject(
-            id: id,
-            name: name,
-            rootPath: rootPath,
-            displayRootPath: displayRootPath ?? rootPath,
-            latestConversationID: latestConversationID
+    public func ensureConversation(
+        project: WorkspaceProject,
+        contact: WorkspaceContact
+    ) async throws -> String {
+        let links: [ProjectContactLinkDTO] = try await client.request(
+            "/projects/\(project.id.pathEncoded)/contacts?limit=500&offset=0"
         )
-    }
-}
+        let matchingLink = links.first(where: { $0.contactID == contact.id })
+        if let existingID = matchingLink?.latestConversationID?.nonEmpty {
+            return existingID
+        }
+        if matchingLink == nil {
+            try await bindContact(projectID: project.id, contactID: contact.id)
+        }
 
-private struct ProjectContactLinkDTO: Decodable {
-    var contactID: String?
+        let conversations: [ProjectConversationDTO] = try await client.request(
+            "/conversations?project_id=\(project.id.queryEncoded)&limit=500&offset=0"
+        )
+        if let existing = conversations
+            .filter({ $0.matches(projectID: project.id, contact: contact) })
+            .sorted(by: ProjectConversationDTO.isPreferred)
+            .first {
+            return existing.id
+        }
 
-    enum CodingKeys: String, CodingKey {
-        case contactID = "contact_id"
+        let request = CreateProjectConversationRequest(
+            title: contact.name,
+            projectID: project.id,
+            metadata: .init(
+                projectID: project.id,
+                projectRoot: project.rootPath,
+                contactID: contact.id,
+                contactAgentID: contact.agentID
+            )
+        )
+        let created: ProjectConversationDTO = try await client.request(
+            "/conversations",
+            method: "POST",
+            body: try JSONEncoder().encode(request)
+        )
+        return created.id
     }
 }
 
@@ -96,12 +77,27 @@ private extension String {
     var pathEncoded: String {
         addingPercentEncoding(withAllowedCharacters: .urlPathComponentAllowed) ?? self
     }
+
+    var queryEncoded: String {
+        addingPercentEncoding(withAllowedCharacters: .urlQueryValueAllowed) ?? self
+    }
+
+    var nonEmpty: String? {
+        let value = trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
 }
 
 private extension CharacterSet {
     static let urlPathComponentAllowed: CharacterSet = {
         var set = CharacterSet.urlPathAllowed
         set.remove(charactersIn: "/?#")
+        return set
+    }()
+
+    static let urlQueryValueAllowed: CharacterSet = {
+        var set = CharacterSet.urlQueryAllowed
+        set.remove(charactersIn: "&=+#?")
         return set
     }()
 }

@@ -126,7 +126,7 @@ struct CreateProjectSheet: View {
     private var footer: some View {
         HStack {
             if viewModel.pendingCreatedProject != nil {
-                Label("项目主体已创建，只需重新绑定联系人", systemImage: "checkmark.circle")
+                Label("项目主体已创建，只需重新准备默认会话", systemImage: "checkmark.circle")
                     .appFont(.caption)
                     .foregroundStyle(.secondary)
             }

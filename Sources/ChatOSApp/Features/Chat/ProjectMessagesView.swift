@@ -17,11 +17,32 @@ struct ProjectMessagesView: View {
                     showsTaskState: true
                 )
                 .frame(minWidth: 620)
+            } else if model.isPreparingProjectConversation(projectID: projectID) {
+                VStack(spacing: 12) {
+                    ProgressView()
+                        .controlSize(.large)
+                    Text("正在连接“叽咕狸”…")
+                        .appFont(.headline)
+                    Text("正在为项目准备首次会话，完成后即可直接发送消息。")
+                        .appFont(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            } else if let error = model.projectConversationPreparationError(projectID: projectID) {
+                ContentUnavailableView {
+                    Label("会话准备失败", systemImage: "exclamationmark.bubble")
+                } description: {
+                    Text(error)
+                } actions: {
+                    Button("重试") {
+                        model.retryProjectConversationPreparation(projectID: projectID)
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
             } else {
                 ContentUnavailableView(
                     "项目还没有可用会话",
                     systemImage: "bubble.left.and.bubble.right",
-                    description: Text("选择项目联系人并发送第一条消息后，会话会显示在这里。")
+                    description: Text("正在等待默认联系人“叽咕狸”可用。")
                 )
             }
         }
