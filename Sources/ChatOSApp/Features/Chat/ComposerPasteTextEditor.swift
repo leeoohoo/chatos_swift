@@ -88,6 +88,29 @@ struct ComposerPasteTextEditor: NSViewRepresentable {
 private final class PasteAwareTextView: NSTextView {
     var onSubmit: (() -> Void)?
     var onPasteContent: ((ComposerPasteContent) -> Void)?
+    private var didRequestInitialFocus = false
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil, !didRequestInitialFocus else { return }
+        didRequestInitialFocus = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let window = self.window else { return }
+            window.makeFirstResponder(self)
+        }
+    }
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let isCommandPaste = event.type == .keyDown
+            && modifiers == .command
+            && event.charactersIgnoringModifiers?.lowercased() == "v"
+        if isCommandPaste {
+            paste(nil)
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
 
     override func keyDown(with event: NSEvent) {
         let isReturn = event.keyCode == 36 || event.keyCode == 76
@@ -105,11 +128,9 @@ private final class PasteAwareTextView: NSTextView {
     }
 
     private func consumePasteboard(_ pasteboard: NSPasteboard) -> Bool {
-        if let values = pasteboard.readObjects(
-            forClasses: [NSURL.self],
-            options: [.urlReadingFileURLsOnly: true]
-        ) as? [URL], !values.isEmpty {
-            onPasteContent?(.files(values))
+        let fileURLs = Self.fileURLs(from: pasteboard)
+        if !fileURLs.isEmpty {
+            onPasteContent?(.files(fileURLs))
             return true
         }
 
@@ -161,6 +182,26 @@ private final class PasteAwareTextView: NSTextView {
         }
 
         return false
+    }
+
+    private static func fileURLs(from pasteboard: NSPasteboard) -> [URL] {
+        if let values = pasteboard.readObjects(
+            forClasses: [NSURL.self],
+            options: [.urlReadingFileURLsOnly: true]
+        ) as? [URL], !values.isEmpty {
+            return values
+        }
+
+        if let value = pasteboard.string(forType: .fileURL),
+           let url = URL(string: value), url.isFileURL {
+            return [url]
+        }
+
+        let legacyFilenamesType = NSPasteboard.PasteboardType("NSFilenamesPboardType")
+        guard let paths = pasteboard.propertyList(
+            forType: legacyFilenamesType
+        ) as? [String] else { return [] }
+        return paths.map { URL(fileURLWithPath: $0) }
     }
 
     private static func timestampedName(_ prefix: String, extension fileExtension: String) -> String {
