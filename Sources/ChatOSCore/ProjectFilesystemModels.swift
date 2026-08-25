@@ -53,6 +53,7 @@ public struct ProjectDirectoryListing: Sendable, Equatable {
 
 public struct ProjectFileContent: Sendable, Equatable {
     public var path: String
+    public var displayPath: String?
     public var name: String
     public var contentType: String?
     public var isBinary: Bool
@@ -63,6 +64,7 @@ public struct ProjectFileContent: Sendable, Equatable {
 
     public init(
         path: String,
+        displayPath: String? = nil,
         name: String,
         contentType: String?,
         isBinary: Bool,
@@ -72,6 +74,7 @@ public struct ProjectFileContent: Sendable, Equatable {
         content: String
     ) {
         self.path = path
+        self.displayPath = displayPath
         self.name = name
         self.contentType = contentType
         self.isBinary = isBinary

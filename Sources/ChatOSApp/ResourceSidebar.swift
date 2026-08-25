@@ -3,6 +3,7 @@ import SwiftUI
 struct ResourceSidebar: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.interfaceFontScale) private var interfaceFontScale
+    @State private var creationSheet: ResourceCreationSheet?
 
     var body: some View {
         List(selection: $model.selection) {
@@ -55,16 +56,47 @@ struct ResourceSidebar: View {
             }
 
             Section {
-                HStack(spacing: 10) {
-                    Image(systemName: "network")
-                        .frame(width: 18)
-                    Text("还没有远端连接")
-                        .appFont(.body)
-                }
+                if model.isRemoteConnectionsLoading && model.remoteConnections.isEmpty {
+                    loadingRow("正在加载远端连接…")
+                } else if model.remoteConnections.isEmpty {
+                    HStack(spacing: 10) {
+                        Image(systemName: "network")
+                            .frame(width: 18)
+                        Text("还没有远端连接")
+                            .appFont(.body)
+                    }
                     .foregroundStyle(.secondary)
                     .padding(.vertical, rowVerticalPadding)
+                } else {
+                    ForEach(model.remoteConnections) { connection in
+                        resourceRow(
+                            title: connection.name,
+                            subtitle: "\(connection.username)@\(connection.host):\(connection.port)",
+                            systemImage: "network",
+                            tint: .accentColor
+                        )
+                        .tag(SidebarSelection.remote(connection.id))
+                        .contextMenu {
+                            Button("编辑", systemImage: "pencil") {
+                                creationSheet = .editRemoteConnection(connection.id)
+                            }
+                        }
+                    }
+                }
             } header: {
                 sectionHeader("远端")
+            }
+
+            if let remoteError = model.remoteConnectionsError {
+                Section {
+                    VStack(alignment: .leading, spacing: 7) {
+                        Label("远端连接加载失败", systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        Text(remoteError).appFont(.caption2).foregroundStyle(.secondary)
+                        Button("重试", action: model.refreshRemoteConnections).controlSize(.small)
+                    }
+                    .padding(.vertical, 4)
+                }
             }
 
             if let workspaceError = model.workspaceError {
@@ -86,21 +118,51 @@ struct ResourceSidebar: View {
         .navigationTitle("ChatOS")
         .toolbar {
             ToolbarItem(placement: .automatic) {
-                Button("刷新资源", systemImage: "arrow.clockwise", action: model.refreshWorkspace)
+                Button("刷新资源", systemImage: "arrow.clockwise", action: model.refreshAllResources)
                     .labelStyle(.iconOnly)
                     .disabled(model.isWorkspaceLoading)
             }
             ToolbarItem(placement: .primaryAction) {
                 Menu {
-                    Button("新建联系人", systemImage: "person.badge.plus") {}
-                    Button("新建项目", systemImage: "folder.badge.plus") {}
-                    Button("新建终端", systemImage: "terminal") {}
+                    Button("新建项目", systemImage: "folder.badge.plus") {
+                        creationSheet = .project
+                    }
                     Divider()
-                    Button("新建远端连接", systemImage: "network.badge.shield.half.filled") {}
+                    Button("新建远端连接", systemImage: "network.badge.shield.half.filled") {
+                        creationSheet = .createRemoteConnection
+                    }
                 } label: {
                     Image(systemName: "plus")
                 }
                 .help("新建资源")
+            }
+        }
+        .sheet(item: $creationSheet) { sheet in
+            switch sheet {
+            case .project:
+                CreateProjectSheetHost(
+                    connectorStatus: model.localConnectorControl.status,
+                    defaultContact: model.defaultProjectContact,
+                    filesystemService: model.projectFilesystemService,
+                    creationService: model.workspaceResourceCreationService,
+                    onCreated: model.registerCreatedProject
+                )
+            case .createRemoteConnection:
+                RemoteConnectionEditorSheetHost(
+                    editingConnection: nil,
+                    connections: model.remoteConnections,
+                    connectorStatus: model.localConnectorControl.status,
+                    service: model.remoteConnectionService,
+                    onSaved: model.registerRemoteConnection
+                )
+            case let .editRemoteConnection(id):
+                RemoteConnectionEditorSheetHost(
+                    editingConnection: model.remoteConnection(id: id),
+                    connections: model.remoteConnections,
+                    connectorStatus: model.localConnectorControl.status,
+                    service: model.remoteConnectionService,
+                    onSaved: model.registerRemoteConnection
+                )
             }
         }
     }
@@ -149,5 +211,19 @@ struct ResourceSidebar: View {
                 .foregroundStyle(.secondary)
         }
         .padding(.vertical, rowVerticalPadding)
+    }
+}
+
+private enum ResourceCreationSheet: Identifiable {
+    case project
+    case createRemoteConnection
+    case editRemoteConnection(String)
+
+    var id: String {
+        switch self {
+        case .project: "project"
+        case .createRemoteConnection: "remote-create"
+        case let .editRemoteConnection(id): "remote-edit-\(id)"
+        }
     }
 }

@@ -88,6 +88,7 @@ public struct NativeProjectFilesystemService: ProjectFilesystemServicing, Sendab
         let object = try value.objectValue()
         return .init(
             path: path,
+            displayPath: resolved.relativePath == "." ? resolved.absoluteURL.lastPathComponent : resolved.relativePath,
             name: resolved.absoluteURL.lastPathComponent,
             contentType: nil,
             isBinary: try object.bool("is_binary"),

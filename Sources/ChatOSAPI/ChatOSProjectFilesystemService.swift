@@ -109,6 +109,8 @@ private struct EntryDTO: Decodable, Sendable {
 
 private struct FileContentDTO: Decodable, Sendable {
     var path: String?
+    var displayPath: String?
+    var relativePath: String?
     var name: String?
     var size: Int64?
     var contentType: String?
@@ -119,6 +121,8 @@ private struct FileContentDTO: Decodable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case path, name, size, writable, content
+        case displayPath = "display_path"
+        case relativePath = "relative_path"
         case contentType = "content_type"
         case isBinary = "is_binary"
         case modifiedAt = "modified_at"
@@ -127,6 +131,7 @@ private struct FileContentDTO: Decodable, Sendable {
     var domainModel: ProjectFileContent {
         ProjectFileContent(
             path: path ?? "",
+            displayPath: displayPath ?? relativePath,
             name: name ?? URL(fileURLWithPath: path ?? "").lastPathComponent,
             contentType: contentType,
             isBinary: isBinary ?? false,

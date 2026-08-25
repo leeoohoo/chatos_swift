@@ -59,7 +59,8 @@ public actor ChatOSAPIClient {
     func request<Response: Decodable & Sendable>(
         _ endpoint: String,
         method: String = "GET",
-        body: Data? = nil
+        body: Data? = nil,
+        additionalHeaders: [String: String] = [:]
     ) async throws -> Response {
         guard let url = makeURL(endpoint: endpoint) else {
             throw ChatOSAPIError.invalidEndpoint
@@ -73,6 +74,7 @@ public actor ChatOSAPIClient {
         if let accessToken {
             headers["Authorization"] = "Bearer \(accessToken)"
         }
+        additionalHeaders.forEach { headers[$0] = $1 }
 
         let response = try await transport.send(
             HTTPRequest(url: url, method: method, headers: headers, body: body)
@@ -87,9 +89,18 @@ public actor ChatOSAPIClient {
             throw ChatOSAPIError.unauthorized
         }
         guard (200..<300).contains(response.statusCode) else {
+            let payload = APIErrorPayload.decode(response.body)
+            if payload.code != nil || payload.challengePrompt != nil {
+                throw ChatOSAPIError.serverDetail(
+                    statusCode: response.statusCode,
+                    message: payload.resolvedMessage,
+                    code: payload.code,
+                    challengePrompt: payload.challengePrompt
+                )
+            }
             throw ChatOSAPIError.server(
                 statusCode: response.statusCode,
-                message: APIErrorPayload.message(from: response.body)
+                message: payload.resolvedMessage
             )
         }
 
@@ -110,12 +121,19 @@ public actor ChatOSAPIClient {
 private struct APIErrorPayload: Decodable {
     var message: String?
     var error: String?
+    var code: String?
+    var challengePrompt: String?
 
-    static func message(from data: Data) -> String {
-        guard let payload = try? JSONDecoder().decode(Self.self, from: data) else {
-            return String(decoding: data, as: UTF8.self)
-        }
-        return payload.message ?? payload.error ?? "Request failed"
+    enum CodingKeys: String, CodingKey {
+        case message, error, code
+        case challengePrompt = "challenge_prompt"
+    }
+
+    var resolvedMessage: String { message ?? error ?? "Request failed" }
+
+    static func decode(_ data: Data) -> Self {
+        (try? JSONDecoder().decode(Self.self, from: data))
+            ?? .init(message: String(decoding: data, as: UTF8.self))
     }
 }
 

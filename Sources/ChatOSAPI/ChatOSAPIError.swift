@@ -7,6 +7,7 @@ public enum ChatOSAPIError: Error, Sendable, Equatable {
     case invalidCredentials
     case unauthorized
     case server(statusCode: Int, message: String)
+    case serverDetail(statusCode: Int, message: String, code: String?, challengePrompt: String?)
     case decoding(String)
     case missingWebSocketTicket
     case missingModelConfiguration
@@ -24,6 +25,8 @@ extension ChatOSAPIError: LocalizedError {
         case .unauthorized:
             "账号或密码错误，或登录状态已过期。"
         case let .server(_, message):
+            message.isEmpty ? "服务器请求失败。" : message
+        case let .serverDetail(_, message, _, _):
             message.isEmpty ? "服务器请求失败。" : message
         case .decoding:
             "服务器数据格式与客户端不一致。"

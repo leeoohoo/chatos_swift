@@ -44,11 +44,7 @@ struct RootView: View {
             case .terminal:
                 TerminalWorkspaceView()
             case let .remote(remoteID):
-                ContentUnavailableView(
-                    "远端连接",
-                    systemImage: "network",
-                    description: Text("远端资源 \(remoteID) 将在后续版本接入 SSH、Terminal 与 SFTP。")
-                )
+                RemoteConnectionDetailView(connectionID: remoteID)
             case nil:
                 ContentUnavailableView(
                     "选择一个资源开始",

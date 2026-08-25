@@ -140,7 +140,11 @@ struct ProjectFileEditorView: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(file.name).appFont(.headline)
-                Text(file.path).appFont(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1)
+                Text(file.displayPath ?? file.name)
+                    .appFont(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .help(file.displayPath ?? file.name)
             }
             Spacer()
             if viewModel.isEditing {
