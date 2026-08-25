@@ -40,8 +40,8 @@ struct ProjectRunSettingsView: View {
     private var pageHeader: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 5) {
-                Text(projectName).font(.title2.weight(.semibold))
-                Text(rootPath ?? "未配置项目目录").font(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
+                Text(projectName).appFont(.title2.weight(.semibold))
+                Text(rootPath ?? "未配置项目目录").appFont(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
                 HStack {
                     StatusCapsule(title: runStatusTitle, color: runStatusColor)
                     StatusCapsule(title: "运行目标 \(viewModel.targets.count)", color: .secondary)
@@ -65,8 +65,8 @@ struct ProjectRunSettingsView: View {
                     VStack(alignment: .leading, spacing: 5) {
                         Label(issue.message, systemImage: issue.kind == "warning" ? "exclamationmark.triangle" : "xmark.octagon")
                             .foregroundStyle(issue.kind == "warning" ? .orange : .red)
-                        if let path = issue.path { Text(path).font(.caption.monospaced()).foregroundStyle(.secondary) }
-                        if let hint = issue.hint { Text(hint).font(.caption).foregroundStyle(.secondary) }
+                        if let path = issue.path { Text(path).appFont(.caption.monospaced()).foregroundStyle(.secondary) }
+                        if let hint = issue.hint { Text(hint).appFont(.caption).foregroundStyle(.secondary) }
                     }
                     .padding(.vertical, 5)
                 }
@@ -92,7 +92,7 @@ struct ProjectRunSettingsView: View {
                         if let manifest = target.manifestPath { settingRow("清单", manifest) }
                         if let entrypoint = target.entrypoint { settingRow("入口", entrypoint) }
                     }
-                    .font(.caption)
+                    .appFont(.caption)
                     .textSelection(.enabled)
                     HStack {
                         Spacer()
@@ -114,12 +114,12 @@ struct ProjectRunSettingsView: View {
                 ForEach(files) { file in
                     DisclosureGroup {
                         if let preview = file.preview, !preview.isEmpty {
-                            Text(preview).font(.caption.monospaced()).textSelection(.enabled).padding(.top, 8)
+                            Text(preview).appFont(.caption.monospaced()).textSelection(.enabled).padding(.top, 8)
                         }
                     } label: {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(file.label).font(.subheadline.weight(.semibold))
-                            Text(file.path).font(.caption.monospaced()).foregroundStyle(.secondary)
+                            Text(file.label).appFont(.subheadline.weight(.semibold))
+                            Text(file.path).appFont(.caption.monospaced()).foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -140,7 +140,7 @@ struct ProjectRunSettingsView: View {
     }
 
     private func settingRow(_ title: String, _ value: String) -> some View {
-        GridRow { Text(title).foregroundStyle(.secondary); Text(value).font(.caption.monospaced()) }
+        GridRow { Text(title).foregroundStyle(.secondary); Text(value).appFont(.caption.monospaced()) }
     }
 
     private var runStatusTitle: String { localizedRunStatus(viewModel.state?.status ?? viewModel.catalog?.status ?? "loading") }
@@ -164,12 +164,12 @@ struct SettingsCard<Content: View>: View {
     @ViewBuilder let content: () -> Content
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Label(title, systemImage: systemImage).font(.headline)
+            Label(title, systemImage: systemImage).appFont(.headline)
             content()
         }
         .padding(17)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 13))
-        .overlay { RoundedRectangle(cornerRadius: 13).stroke(.separator.opacity(0.7), lineWidth: 1) }
+        .background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 13))
+        .overlay { RoundedRectangle(cornerRadius: 13).stroke(AppPalette.border.opacity(0.78), lineWidth: 1) }
     }
 }

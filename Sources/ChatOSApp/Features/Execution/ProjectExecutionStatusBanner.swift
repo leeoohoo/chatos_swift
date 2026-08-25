@@ -9,13 +9,13 @@ struct ProjectExecutionStatusBanner: View {
         if viewModel.executionState.isProjectExecution {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: presentation.icon)
-                    .font(.body.weight(.semibold))
+                    .appFont(.body.weight(.semibold))
                     .foregroundStyle(presentation.tint)
                     .frame(width: 22)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(presentation.title).font(.subheadline.weight(.semibold))
+                    Text(presentation.title).appFont(.subheadline.weight(.semibold))
                     Text(presentation.detail)
-                        .font(.caption)
+                        .appFont(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 16)

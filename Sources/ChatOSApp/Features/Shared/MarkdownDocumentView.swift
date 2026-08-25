@@ -26,12 +26,12 @@ private struct MarkdownBlockView: View {
         switch block {
         case let .heading(level, text):
             MarkdownInlineText(text: text)
-                .font(headingFont(level))
+                .appFont(headingFont(level))
                 .padding(.top, level <= 2 ? 4 : 0)
 
         case let .paragraph(text):
             MarkdownInlineText(text: text)
-                .font(.callout)
+                .appFont(.callout)
                 .lineSpacing(4)
 
         case let .list(items):
@@ -39,11 +39,11 @@ private struct MarkdownBlockView: View {
                 ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(item.marker)
-                            .font(.callout.monospacedDigit().weight(.semibold))
+                            .appFont(.callout.monospacedDigit().weight(.semibold))
                             .foregroundStyle(AppPalette.ai)
                             .frame(minWidth: 15, alignment: .trailing)
                         MarkdownInlineText(text: item.text)
-                            .font(.callout)
+                            .appFont(.callout)
                             .lineSpacing(3)
                     }
                     .padding(.leading, CGFloat(item.depth) * 18)
@@ -56,7 +56,7 @@ private struct MarkdownBlockView: View {
                     .fill(AppPalette.ai.opacity(0.55))
                     .frame(width: 3)
                 MarkdownInlineText(text: text)
-                    .font(.callout)
+                    .appFont(.callout)
                     .foregroundStyle(.secondary)
                     .lineSpacing(3)
             }
@@ -66,17 +66,17 @@ private struct MarkdownBlockView: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
                     Text(language?.isEmpty == false ? language! : "代码")
-                        .font(.caption2.weight(.semibold))
+                        .appFont(.caption2.weight(.semibold))
                         .foregroundStyle(.secondary)
                     Spacer()
                 }
                 .padding(.horizontal, 11)
                 .padding(.vertical, 7)
-                .background(Color(nsColor: .controlBackgroundColor))
+                .background(AppPalette.surfaceSubtle)
 
                 ScrollView(.horizontal) {
                     Text(content)
-                        .font(.caption.monospaced())
+                        .appFont(.caption.monospaced())
                         .lineSpacing(3)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: true, vertical: false)
@@ -98,7 +98,7 @@ private struct MarkdownBlockView: View {
         }
     }
 
-    private func headingFont(_ level: Int) -> Font {
+    private func headingFont(_ level: Int) -> AppFontSpec {
         switch level {
         case 1: .title3.weight(.bold)
         case 2: .headline.weight(.bold)
@@ -155,11 +155,11 @@ private struct MarkdownTableView: View {
 
     private func tableCell(_ text: String, isHeader: Bool) -> some View {
         MarkdownInlineText(text: text)
-            .font(.caption.weight(isHeader ? .semibold : .regular))
+            .appFont(.caption.weight(isHeader ? .semibold : .regular))
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
             .frame(minWidth: 110, alignment: .leading)
-            .background(isHeader ? Color(nsColor: .controlBackgroundColor) : .clear)
+            .background(isHeader ? AppPalette.surfaceSubtle : .clear)
             .overlay(alignment: .trailing) {
                 Rectangle()
                     .fill(Color(nsColor: .separatorColor))

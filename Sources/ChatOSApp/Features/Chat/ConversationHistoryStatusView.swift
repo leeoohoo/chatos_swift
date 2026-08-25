@@ -6,7 +6,7 @@ struct ConversationHistoryStatusView: View {
     var body: some View {
         if conversation.isRefreshing {
             Label("正在同步最新消息…", systemImage: "arrow.triangle.2.circlepath")
-                .font(.caption)
+                .appFont(.caption)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 20)
                 .padding(.vertical, 7)
@@ -15,9 +15,9 @@ struct ConversationHistoryStatusView: View {
         } else if let error = conversation.historyError {
             HStack(spacing: 8) {
                 Label("历史同步失败", systemImage: "exclamationmark.triangle")
-                    .font(.caption.weight(.medium))
+                    .appFont(.caption.weight(.medium))
                 Text(error)
-                    .font(.caption)
+                    .appFont(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 Spacer()

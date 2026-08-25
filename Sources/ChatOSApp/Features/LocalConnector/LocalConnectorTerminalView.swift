@@ -29,7 +29,7 @@ struct LocalConnectorTerminalView: View {
                 Spacer()
                 if let workspace = selectedWorkspace {
                     Text(workspace.absoluteRoot)
-                        .font(.caption.monospaced())
+                        .appFont(.caption.monospaced())
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .textSelection(.enabled)
@@ -40,7 +40,7 @@ struct LocalConnectorTerminalView: View {
 
             ScrollView {
                 Text(outputText)
-                    .font(.system(size: 13, design: .monospaced))
+                    .appFont(.system(size: 13, design: .monospaced))
                     .foregroundStyle(outputColor)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -50,11 +50,11 @@ struct LocalConnectorTerminalView: View {
 
             HStack(alignment: .center, spacing: 10) {
                 Text("❯")
-                    .font(.system(.body, design: .monospaced).weight(.bold))
+                    .appFont(.system(.body, design: .monospaced).weight(.bold))
                     .foregroundStyle(.green)
                 TextField("输入命令", text: $command)
                     .textFieldStyle(.plain)
-                    .font(.system(.body, design: .monospaced))
+                    .appFont(.system(.body, design: .monospaced))
                     .onSubmit(run)
                 Button("执行", systemImage: "play.fill", action: run)
                     .buttonStyle(.borderedProminent)
@@ -70,9 +70,9 @@ struct LocalConnectorTerminalView: View {
         VStack(spacing: 0) {
             HStack {
                 Label("执行历史", systemImage: "clock.arrow.circlepath")
-                    .font(.headline)
+                    .appFont(.headline)
                 Text("\(viewModel.commandHistory.count)")
-                    .font(.caption.monospacedDigit())
+                    .appFont(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button("清空", role: .destructive) { viewModel.clearCommandHistory() }
@@ -87,7 +87,7 @@ struct LocalConnectorTerminalView: View {
                         .frame(width: 18)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(entry.display)
-                            .font(.system(.callout, design: .monospaced))
+                            .appFont(.system(.callout, design: .monospaced))
                             .lineLimit(2)
                             .textSelection(.enabled)
                         HStack(spacing: 8) {
@@ -97,12 +97,12 @@ struct LocalConnectorTerminalView: View {
                                 Text("exit \(exitCode)")
                             }
                         }
-                        .font(.caption2)
+                        .appFont(.caption2)
                         .foregroundStyle(.secondary)
                     }
                     Spacer()
                     Text(entry.status)
-                        .font(.caption.weight(.medium))
+                        .appFont(.caption.weight(.medium))
                         .foregroundStyle(historyColor(entry.status))
                 }
                 .padding(.vertical, 3)

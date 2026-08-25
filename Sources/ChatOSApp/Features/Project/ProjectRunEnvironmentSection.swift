@@ -25,7 +25,7 @@ struct ProjectRunEnvironmentSection: View {
                 if !kinds.isEmpty {
                     HStack {
                         Text("“自动”会使用上面显示的程序路径。")
-                            .font(.caption)
+                            .appFont(.caption)
                             .foregroundStyle(.secondary)
                         Spacer()
                         Button(viewModel.isMutating ? "保存中…" : "保存工具选择", systemImage: "square.and.arrow.down") {
@@ -43,9 +43,9 @@ struct ProjectRunEnvironmentSection: View {
                 } label: {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("高级设置：环境变量")
-                            .font(.subheadline.weight(.semibold))
+                            .appFont(.subheadline.weight(.semibold))
                         Text("只有项目明确要求 PORT、NODE_ENV 等变量时才需要设置。")
-                            .font(.caption)
+                            .appFont(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -64,15 +64,15 @@ struct ProjectRunEnvironmentSection: View {
         let ready = environment.validationIssues.isEmpty
         return HStack(alignment: .top, spacing: 12) {
             Image(systemName: ready ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                .font(.title3)
+                .appFont(.title3)
                 .foregroundStyle(ready ? .green : .orange)
             VStack(alignment: .leading, spacing: 4) {
                 Text(ready ? "运行环境已准备好" : "启动前还需要处理环境问题")
-                    .font(.subheadline.weight(.semibold))
+                    .appFont(.subheadline.weight(.semibold))
                 Text(ready
                      ? "已为“\(targetName)”找到所需的本机工具。通常无需修改下面的自动选择。"
                      : "系统会在本机启动“\(targetName)”。请先处理上方预检提示中缺少的工具。")
-                    .font(.callout)
+                    .appFont(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -93,17 +93,17 @@ struct ProjectRunEnvironmentSection: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 7) {
-                    Text(toolchainTitle(kind)).font(.subheadline.weight(.semibold))
+                    Text(toolchainTitle(kind)).appFont(.subheadline.weight(.semibold))
                     Text(selectedOption == nil ? "未找到" : "已找到")
-                        .font(.caption.weight(.medium))
+                        .appFont(.caption.weight(.medium))
                         .foregroundStyle(selectedOption == nil ? .red : .green)
                 }
                 Text(toolchainDescription(kind))
-                    .font(.caption)
+                    .appFont(.caption)
                     .foregroundStyle(.secondary)
                 if let selectedOption {
                     Text(selectedOption.path)
-                        .font(.caption.monospaced())
+                        .appFont(.caption.monospaced())
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                         .truncationMode(.middle)
@@ -139,22 +139,22 @@ struct ProjectRunEnvironmentSection: View {
     private var environmentVariablesEditor: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("这些值只会传给这台 Mac 上由 ChatOS 启动的项目进程，不会上传到 ChatOS。")
-                .font(.caption)
+                .appFont(.caption)
                 .foregroundStyle(.secondary)
 
             if viewModel.environmentVariables.isEmpty {
                 Text("当前没有自定义环境变量。")
-                    .font(.callout)
+                    .appFont(.callout)
                     .foregroundStyle(.secondary)
             }
 
             ForEach($viewModel.environmentVariables) { $variable in
                 HStack {
                     TextField("变量名，例如 PORT", text: $variable.key)
-                        .font(.body.monospaced())
+                        .appFont(.body.monospaced())
                         .frame(maxWidth: 260)
                     TextField("值", text: $variable.value)
-                        .font(.body.monospaced())
+                        .appFont(.body.monospaced())
                     Button(role: .destructive) {
                         viewModel.removeEnvironmentVariable(id: variable.id)
                     } label: {

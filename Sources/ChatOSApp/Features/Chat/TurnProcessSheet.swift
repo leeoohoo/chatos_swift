@@ -64,10 +64,10 @@ struct TurnProcessSheet: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(viewModel.turn.userMessage.text)
-                .font(.headline)
+                .appFont(.headline)
                 .lineLimit(3)
             Text("\(viewModel.nodes.count) 个真实过程节点")
-                .font(.caption)
+                .appFont(.caption)
                 .foregroundStyle(.secondary)
         }
         .padding(.bottom, 22)
@@ -82,7 +82,7 @@ private struct ProcessNodeRow: View {
         HStack(alignment: .top, spacing: 14) {
             VStack(spacing: 0) {
                 Image(systemName: symbol)
-                    .font(.system(size: 13, weight: .semibold))
+                    .appFont(.system(size: 13, weight: .semibold))
                     .foregroundStyle(color)
                     .frame(width: 30, height: 30)
                     .background(color.opacity(0.11), in: Circle())
@@ -95,17 +95,17 @@ private struct ProcessNodeRow: View {
 
             VStack(alignment: .leading, spacing: 7) {
                 HStack {
-                    Text(node.title).font(.subheadline.weight(.semibold))
+                    Text(node.title).appFont(.subheadline.weight(.semibold))
                     Spacer()
                     if let timestamp = node.timestamp {
                         Text(timestamp, style: .time)
-                            .font(.caption2)
+                            .appFont(.caption2)
                             .foregroundStyle(.tertiary)
                     }
                 }
                 if let detail = node.detail {
                     Text(detail)
-                        .font(.callout)
+                        .appFont(.callout)
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
                         .lineLimit(6)

@@ -63,7 +63,7 @@ struct MessageTaskDetailSections: View {
     private var modelOutputSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Label("模型输出", systemImage: "sparkles")
-                .font(.headline)
+                .appFont(.headline)
                 .foregroundStyle(AppPalette.ai)
 
             if let output = modelOutput {
@@ -72,12 +72,12 @@ struct MessageTaskDetailSections: View {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
                     Text("正在读取本次运行的模型输出…")
-                        .font(.callout)
+                        .appFont(.callout)
                         .foregroundStyle(.secondary)
                 }
             } else {
                 Text(task.lastRunID == nil ? "该任务尚未产生运行记录。" : "本次运行没有返回模型输出。")
-                    .font(.callout)
+                    .appFont(.callout)
                     .foregroundStyle(.secondary)
             }
         }
@@ -110,7 +110,7 @@ struct MessageTaskDetailSections: View {
                 LabeledContent("更新时间", value: updatedAt.formatted(date: .abbreviated, time: .standard))
             }
         }
-        .font(.callout)
+        .appFont(.callout)
         .textSelection(.enabled)
     }
 
@@ -118,7 +118,7 @@ struct MessageTaskDetailSections: View {
     private var prerequisites: some View {
         if prerequisiteItems.isEmpty {
             Text("无前置任务")
-                .font(.callout)
+                .appFont(.callout)
                 .foregroundStyle(.secondary)
         } else {
             VStack(alignment: .leading, spacing: 8) {
@@ -126,16 +126,16 @@ struct MessageTaskDetailSections: View {
                     VStack(alignment: .leading, spacing: 5) {
                         HStack(spacing: 8) {
                             Text(item.title ?? "任务名称暂不可用")
-                                .font(.callout.weight(.medium))
+                                .appFont(.callout.weight(.medium))
                             Spacer(minLength: 8)
                             if let status = item.status {
                                 Text(status)
-                                    .font(.caption2.weight(.semibold))
+                                    .appFont(.caption2.weight(.semibold))
                                     .foregroundStyle(.secondary)
                             }
                         }
                         Text(item.id)
-                            .font(.caption2.monospaced())
+                            .appFont(.caption2.monospaced())
                             .foregroundStyle(.tertiary)
                             .textSelection(.enabled)
                     }
@@ -163,7 +163,7 @@ struct MessageTaskDetailSections: View {
                 LabeledContent("依赖上下文", value: task.dependencyContextRefs.joined(separator: "、"))
             }
         }
-        .font(.callout)
+        .appFont(.callout)
         .textSelection(.enabled)
     }
 
@@ -233,7 +233,7 @@ struct TaskDetailTextCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.subheadline.weight(.semibold))
+            Text(title).appFont(.subheadline.weight(.semibold))
             TaskDetailMarkdownText(text: text)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -257,7 +257,7 @@ private struct TaskDetailNamedText: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(label)
-                .font(.caption.weight(.medium))
+                .appFont(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
             MarkdownDocumentView(markdown: value)
         }
@@ -269,7 +269,7 @@ private struct TaskDetailCodeBlock: View {
 
     var body: some View {
         Text(text)
-            .font(.caption.monospaced())
+            .appFont(.caption.monospaced())
             .lineSpacing(2)
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -298,7 +298,7 @@ private struct TaskDetailDisclosureSection<Content: View>: View {
             content
                 .padding(.top, 10)
         } label: {
-            Text(title).font(.subheadline.weight(.semibold))
+            Text(title).appFont(.subheadline.weight(.semibold))
         }
         .padding(12)
         .background(.quaternary.opacity(0.24), in: RoundedRectangle(cornerRadius: 10))
@@ -317,7 +317,7 @@ private struct TaskDetailSubsection<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
-                .font(.caption.weight(.semibold))
+                .appFont(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
             content
         }

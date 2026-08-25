@@ -181,7 +181,8 @@ struct MessageTaskGraphCanvas: View {
         }
         .controlSize(.small)
         .padding(7)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 9))
+        .background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 9))
+        .overlay { RoundedRectangle(cornerRadius: 9).stroke(AppPalette.border.opacity(0.8)) }
         .overlay { RoundedRectangle(cornerRadius: 9).stroke(.separator) }
     }
 

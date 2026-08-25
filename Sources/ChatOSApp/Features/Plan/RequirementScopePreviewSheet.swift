@@ -32,9 +32,9 @@ struct RequirementScopePreviewSheet: View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 4) {
                 Label("执行范围预览", systemImage: "arrow.triangle.branch")
-                    .font(.title3.weight(.semibold))
+                    .appFont(.title3.weight(.semibold))
                 Text(requirement.title)
-                    .font(.caption)
+                    .appFont(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
@@ -64,7 +64,7 @@ struct RequirementScopePreviewSheet: View {
     private var footer: some View {
         HStack {
             Text("这里只预览执行计划覆盖的需求范围，不会生成任务，也不会启动执行。")
-                .font(.caption)
+                .appFont(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
             Button("完成", action: dismiss.callAsFunction)
@@ -110,7 +110,7 @@ private struct ScopeLegend: View {
 
     var body: some View {
         Text(title)
-            .font(.caption.weight(.medium))
+            .appFont(.caption.weight(.medium))
             .foregroundStyle(color)
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
@@ -127,7 +127,7 @@ private struct PlanStatChip: View {
             Text(title).foregroundStyle(.secondary)
             Text("\(value)").fontWeight(.semibold)
         }
-        .font(.caption)
+        .appFont(.caption)
     }
 }
 
@@ -216,7 +216,7 @@ private struct RequirementScopeGraphCanvas: View {
                 }
                 .controlSize(.small)
                 .padding(7)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 9))
+                .background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 9))
                 .overlay { RoundedRectangle(cornerRadius: 9).stroke(.separator) }
                 .padding(12)
             }
@@ -307,13 +307,13 @@ private struct RequirementScopeNode: View {
                     .background(kind.color.opacity(0.10), in: Capsule())
                 PlanStatusBadge(status: requirement.status)
             }
-            .font(.caption2.weight(.medium))
+            .appFont(.caption2.weight(.medium))
             Text(requirement.title)
-                .font(.caption.weight(.semibold))
+                .appFont(.caption.weight(.semibold))
                 .lineLimit(2)
             if let summary = requirement.summary, !summary.isEmpty {
                 Text(summary)
-                    .font(.caption2)
+                    .appFont(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }

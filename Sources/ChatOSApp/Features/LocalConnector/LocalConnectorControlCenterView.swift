@@ -39,10 +39,10 @@ struct LocalConnectorControlCenterView: View {
                     .frame(width: 8, height: 8)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("SWIFT CONNECTOR")
-                        .font(.caption2.weight(.semibold))
+                        .appFont(.caption2.weight(.semibold))
                         .foregroundStyle(.tertiary)
                     Text(connectionLabel)
-                        .font(.caption)
+                        .appFont(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -88,19 +88,19 @@ struct LocalConnectorControlCenterView: View {
     private var header: some View {
         HStack(spacing: 14) {
             Image(systemName: viewModel.selectedTab.systemImage)
-                .font(.system(size: 21, weight: .medium))
+                .appFont(.system(size: 21, weight: .medium))
                 .foregroundStyle(.tint)
                 .frame(width: 42, height: 42)
                 .background(.tint.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
             VStack(alignment: .leading, spacing: 3) {
                 Text(viewModel.selectedTab.eyebrow)
-                    .font(.caption2.weight(.semibold))
+                    .appFont(.caption2.weight(.semibold))
                     .tracking(0.8)
                     .foregroundStyle(.secondary)
                 Text(viewModel.selectedTab.rawValue)
-                    .font(.title2.weight(.semibold))
+                    .appFont(.title2.weight(.semibold))
                 Text(viewModel.selectedTab.description)
-                    .font(.subheadline)
+                    .appFont(.subheadline)
                     .foregroundStyle(.secondary)
             }
             Spacer()
@@ -123,7 +123,7 @@ struct LocalConnectorControlCenterView: View {
             Image(systemName: systemImage)
                 .foregroundStyle(tint)
             Text(text)
-                .font(.callout)
+                .appFont(.callout)
                 .textSelection(.enabled)
             Spacer()
             Button("关闭", systemImage: "xmark", action: viewModel.clearMessages)
@@ -174,10 +174,10 @@ struct LocalConnectorCard<Content: View>: View {
                     .frame(width: 22)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.headline)
+                        .appFont(.headline)
                     if let subtitle {
                         Text(subtitle)
-                            .font(.caption)
+                            .appFont(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -205,7 +205,7 @@ struct LocalConnectorKeyValueRow: View {
                 .foregroundStyle(.secondary)
             Spacer(minLength: 20)
             Text(value)
-                .font(monospaced ? .system(.callout, design: .monospaced) : .callout)
+                .appFont(monospaced ? .system(.callout, design: .monospaced) : .callout)
                 .multilineTextAlignment(.trailing)
                 .textSelection(.enabled)
         }

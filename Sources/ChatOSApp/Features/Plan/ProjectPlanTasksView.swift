@@ -9,15 +9,15 @@ struct ProjectPlanTasksView: View {
             LazyVStack(alignment: .leading, spacing: 12) {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("项目任务").font(.headline)
+                        Text("项目任务").appFont(.headline)
                         Text("\(viewModel.workItems.count) 个任务 · \(viewModel.openWorkItemCount) 个未完成")
-                            .font(.caption)
+                            .appFont(.caption)
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
                     if !viewModel.workItems.isEmpty && viewModel.openWorkItemCount == 0 {
                         Label("已全部完成", systemImage: "checkmark.circle.fill")
-                            .font(.caption.weight(.medium))
+                            .appFont(.caption.weight(.medium))
                             .foregroundStyle(.green)
                     }
                 }
@@ -27,11 +27,11 @@ struct ProjectPlanTasksView: View {
                         "任务已按前置关系排序；每一项会显示它开始前必须完成的任务。",
                         systemImage: "arrow.right"
                     )
-                    .font(.caption)
+                    .appFont(.caption)
                     .foregroundStyle(.secondary)
                     .padding(10)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(nsColor: .controlBackgroundColor).opacity(0.65), in: RoundedRectangle(cornerRadius: 9))
+                    .background(AppPalette.surfaceSubtle, in: RoundedRectangle(cornerRadius: 9))
                 }
 
                 if viewModel.workItems.isEmpty {
@@ -86,13 +86,13 @@ private struct ProjectWorkItemRow: View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(alignment: .top, spacing: 11) {
                 Text("\(index)")
-                    .font(.caption.monospacedDigit().weight(.semibold))
+                    .appFont(.caption.monospacedDigit().weight(.semibold))
                     .foregroundStyle(.secondary)
                     .frame(width: 24, height: 24)
                     .background(.quaternary, in: Circle())
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(alignment: .firstTextBaseline) {
-                        Text(item.title).font(.subheadline.weight(.semibold))
+                        Text(item.title).appFont(.subheadline.weight(.semibold))
                         Spacer()
                         WorkItemStatusBadge(status: item.status)
                         StatusCapsule(title: "P\(item.priority)", color: .orange)
@@ -129,8 +129,8 @@ private struct ProjectWorkItemRow: View {
             }
         }
         .padding(14)
-        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 11))
-        .overlay { RoundedRectangle(cornerRadius: 11).stroke(.separator.opacity(0.65)) }
+        .background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 11))
+        .overlay { RoundedRectangle(cornerRadius: 11).stroke(AppPalette.border.opacity(0.75)) }
     }
 
     private func dependencyLine(
@@ -141,16 +141,16 @@ private struct ProjectWorkItemRow: View {
     ) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Text(title)
-                .font(.caption.weight(.medium))
+                .appFont(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
                 .frame(width: 88, alignment: .leading)
             if values.isEmpty {
-                Text(empty).font(.caption).foregroundStyle(.tertiary)
+                Text(empty).appFont(.caption).foregroundStyle(.tertiary)
             } else {
                 FlowLayout(spacing: 5) {
                     ForEach(values) { value in
                         Text(value.title)
-                            .font(.caption)
+                            .appFont(.caption)
                             .foregroundStyle(color)
                             .padding(.horizontal, 7)
                             .padding(.vertical, 3)
@@ -167,7 +167,7 @@ private struct PlanTaskMetadataPill: View {
 
     var body: some View {
         Text(title)
-            .font(.caption2)
+            .appFont(.caption2)
             .foregroundStyle(.secondary)
             .padding(.horizontal, 7)
             .padding(.vertical, 3)

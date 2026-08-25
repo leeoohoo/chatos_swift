@@ -25,17 +25,17 @@ struct LoginView: View {
     private var introduction: some View {
         VStack(alignment: .leading, spacing: 30) {
             Image(systemName: "sparkles")
-                .font(.system(size: 34, weight: .semibold))
+                .appFont(.system(size: 34, weight: .semibold))
                 .foregroundStyle(AppPalette.ai)
                 .frame(width: 74, height: 74)
                 .background(AppPalette.ai.opacity(0.1), in: Circle())
 
             VStack(alignment: .leading, spacing: 12) {
                 Text("把长期项目，变成\n可以持续推进的协作。")
-                    .font(.system(size: 32, weight: .bold, design: .rounded))
+                    .appFont(.system(size: 32, weight: .bold, design: .rounded))
                     .lineSpacing(5)
                 Text("工作区、聊天、任务过程和本机能力全部原生呈现。")
-                    .font(.body)
+                    .appFont(.body)
                     .foregroundStyle(.secondary)
             }
 
@@ -53,7 +53,7 @@ struct LoginView: View {
         VStack(alignment: .leading, spacing: 26) {
             VStack(alignment: .leading, spacing: 7) {
                 Text("登录")
-                    .font(.system(size: 29, weight: .bold))
+                    .appFont(.system(size: 29, weight: .bold))
                 Text("使用 ChatOS 平台账号继续")
                     .foregroundStyle(.secondary)
             }
@@ -74,7 +74,7 @@ struct LoginView: View {
 
             if let errorMessage = authentication.errorMessage {
                 Label(errorMessage, systemImage: "exclamationmark.circle.fill")
-                    .font(.callout)
+                    .appFont(.callout)
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -96,7 +96,7 @@ struct LoginView: View {
             .disabled(!authentication.canLogin)
 
             Label("APISIX 网关 · 127.0.0.1:9080", systemImage: "network")
-                .font(.caption)
+                .appFont(.caption)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
@@ -108,14 +108,14 @@ struct LoginView: View {
 
     private func feature(_ title: String, _ systemImage: String) -> some View {
         Label(title, systemImage: systemImage)
-            .font(.headline)
+            .appFont(.headline)
             .symbolRenderingMode(.hierarchical)
             .foregroundStyle(.primary)
     }
 
     private func fieldLabel(_ title: String) -> some View {
         Text(title)
-            .font(.caption.weight(.semibold))
+            .appFont(.caption.weight(.semibold))
             .padding(.bottom, -11)
     }
 }

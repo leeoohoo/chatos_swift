@@ -37,7 +37,7 @@ struct LocalConnectorConnectionView: View {
                         .fill(status.connectorRunning ? .green : .orange)
                         .frame(width: 10, height: 10)
                     Text(status.connectorRunning ? "网关长连接正常" : status.configured ? "已配对，正在等待网关" : "尚未配对")
-                        .font(.headline)
+                        .appFont(.headline)
                     Spacer()
                 }
                 Divider()
@@ -73,7 +73,7 @@ struct LocalConnectorConnectionView: View {
                 boundaryRow("开发环境", value: status.developerMode ? "已开启" : "已关闭", image: "hammer")
                 Divider()
                 Text("云端请求必须先经过设备签名、工作区边界与命令审批；展示层不会直接访问文件或执行命令。")
-                    .font(.caption)
+                    .appFont(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -90,7 +90,7 @@ struct LocalConnectorConnectionView: View {
             Text(value)
                 .foregroundStyle(.secondary)
         }
-        .font(.callout)
+        .appFont(.callout)
     }
 
     private func statusText(_ status: LocalConnectorStatus) -> String {

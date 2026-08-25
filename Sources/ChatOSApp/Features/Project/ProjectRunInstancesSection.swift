@@ -8,7 +8,7 @@ struct ProjectRunInstancesSection: View {
     var body: some View {
         SettingsCard(title: "运行实例", systemImage: "rectangle.stack") {
             Text("每次点击“启动新实例”都会在本机创建一个独立进程。展开实例即可查看持续更新的标准输出和错误日志。")
-                .font(.callout)
+                .appFont(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -46,7 +46,7 @@ struct ProjectRunInstancesSection: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 8) {
-                        Text(instance.name).font(.subheadline.weight(.semibold))
+                        Text(instance.name).appFont(.subheadline.weight(.semibold))
                         StatusCapsule(
                             title: localizedRunStatus(instance.status),
                             color: instance.isRunning ? .green : statusColor(instance.status)
@@ -60,7 +60,7 @@ struct ProjectRunInstancesSection: View {
                             Text(cwd).lineLimit(1).truncationMode(.middle)
                         }
                     }
-                    .font(.caption.monospaced())
+                    .appFont(.caption.monospaced())
                     .foregroundStyle(.secondary)
                 }
 
@@ -86,10 +86,10 @@ struct ProjectRunInstancesSection: View {
             } label: {
                 HStack(spacing: 7) {
                     Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
+                        .appFont(.caption.weight(.semibold))
                         .rotationEffect(.degrees(isExpanded.wrappedValue ? 90 : 0))
                     Text(isExpanded.wrappedValue ? "收起运行日志" : "展开运行日志")
-                        .font(.subheadline.weight(.medium))
+                        .appFont(.subheadline.weight(.medium))
                     Spacer()
                 }
                 .contentShape(Rectangle())
@@ -100,16 +100,16 @@ struct ProjectRunInstancesSection: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Label("实时运行日志", systemImage: "text.alignleft")
-                            .font(.caption.weight(.semibold))
+                            .appFont(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
                         Spacer()
                         if let exitCode = instance.exitCode {
                             Text("退出码 \(exitCode)")
-                                .font(.caption.monospacedDigit())
+                                .appFont(.caption.monospacedDigit())
                                 .foregroundStyle(exitCode == 0 ? Color.secondary : Color.red)
                         } else if instance.isRunning {
                             Label("每秒刷新", systemImage: "arrow.clockwise")
-                                .font(.caption)
+                                .appFont(.caption)
                                 .foregroundStyle(.secondary)
                         }
                     }

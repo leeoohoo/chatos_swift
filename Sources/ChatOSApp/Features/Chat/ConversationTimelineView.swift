@@ -39,11 +39,11 @@ struct ConversationTimelineView: View {
 
     private var header: some View {
         HStack {
-            Text(title).font(.subheadline.weight(.semibold))
+            Text(title).appFont(.subheadline.weight(.semibold))
             Spacer()
             if showsTaskState {
                 Label("执行中 · 可发送引导", systemImage: "sparkles")
-                    .font(.caption.weight(.medium))
+                    .appFont(.caption.weight(.medium))
                     .foregroundStyle(AppPalette.ai)
             }
         }

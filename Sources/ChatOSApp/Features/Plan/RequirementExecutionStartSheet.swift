@@ -28,9 +28,9 @@ struct RequirementExecutionStartSheet: View {
     private var header: some View {
         HStack(alignment: .top, spacing: 14) {
             VStack(alignment: .leading, spacing: 5) {
-                Text("执行计划工作台").font(.title3.weight(.semibold))
+                Text("执行计划工作台").appFont(.title3.weight(.semibold))
                 Text(requirement.title)
-                    .font(.caption)
+                    .appFont(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
@@ -48,11 +48,11 @@ struct RequirementExecutionStartSheet: View {
                     isStarting ? "正在准备执行计划" : "等待开始生成执行计划",
                     systemImage: isStarting ? "wand.and.stars" : "play.circle"
                 )
-                .font(.headline)
+                .appFont(.headline)
                 Text(isStarting
                      ? "云端规划 Agent 正在读取需求、技术文档和项目任务，并创建完整依赖关系。"
                      : "开始后，规划 Agent 会先生成任务节点和依赖图；只有你检查并确认后才会真正执行。")
-                    .font(.callout)
+                    .appFont(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -73,7 +73,7 @@ struct RequirementExecutionStartSheet: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Label("调整本次计划", systemImage: "text.bubble")
-                    .font(.subheadline.weight(.semibold))
+                    .appFont(.subheadline.weight(.semibold))
                 TextField(
                     "例如：先补测试，再拆分接口；把部署放到最后……",
                     text: $feedback,
@@ -83,12 +83,12 @@ struct RequirementExecutionStartSheet: View {
                 .lineLimit(4...8)
                 .disabled(isStarting)
                 Text("可以留空。这里的意见只影响本次执行计划。")
-                    .font(.caption)
+                    .appFont(.caption)
                     .foregroundStyle(.secondary)
             }
             .padding(16)
         }
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.55))
+        .background(AppPalette.surfaceSubtle)
     }
 
     private var graphPlaceholder: some View {
@@ -96,9 +96,9 @@ struct RequirementExecutionStartSheet: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Label("实时任务流程图", systemImage: "point.3.connected.trianglepath.dotted")
-                        .font(.headline)
+                        .appFont(.headline)
                     Text("创建第一个任务后，流程图会立即在这里更新。")
-                        .font(.caption)
+                        .appFont(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -110,15 +110,15 @@ struct RequirementExecutionStartSheet: View {
                     ProgressView().controlSize(.large)
                 } else {
                     Image(systemName: "point.3.connected.trianglepath.dotted")
-                        .font(.system(size: 34))
+                        .appFont(.system(size: 34))
                         .foregroundStyle(.secondary)
                 }
                 Text(isStarting ? "等待第一个任务节点" : "任务流程尚未开始生成")
-                    .font(.headline)
+                    .appFont(.headline)
                 Text(isStarting
                      ? "这里只展示规划结果，不会提前启动任务。"
                      : "点击下方按钮后开始生成；生成完毕后可以逐个检查任务节点、过程和运行详情。")
-                    .font(.callout)
+                    .appFont(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 430)
@@ -131,7 +131,7 @@ struct RequirementExecutionStartSheet: View {
     private var footer: some View {
         HStack {
             Text("生成执行计划和最终执行是两个独立操作。")
-                .font(.caption)
+                .appFont(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
             Button("取消", action: dismiss.callAsFunction)
@@ -170,13 +170,13 @@ private struct PlanStep: View {
                 if active {
                     ProgressView().controlSize(.mini)
                 } else {
-                    Text("\(number)").font(.caption2.weight(.bold)).foregroundStyle(.secondary)
+                    Text("\(number)").appFont(.caption2.weight(.bold)).foregroundStyle(.secondary)
                 }
             }
             .frame(width: 24, height: 24)
             VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(.subheadline.weight(.medium))
-                Text(detail).font(.caption).foregroundStyle(.secondary)
+                Text(title).appFont(.subheadline.weight(.medium))
+                Text(detail).appFont(.caption).foregroundStyle(.secondary)
             }
         }
     }

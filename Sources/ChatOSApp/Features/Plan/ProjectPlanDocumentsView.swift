@@ -28,36 +28,62 @@ struct ProjectPlanDocumentsView: View {
         VStack(spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("技术文档").font(.headline)
+                    Text("技术文档").appFont(.headline)
                     Text("\(viewModel.documents.count) 份文档")
-                        .font(.caption)
+                        .appFont(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
             }
             .padding(14)
             Divider()
-            List(viewModel.documents, selection: $viewModel.selectedDocumentID) { document in
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(document.title)
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(2)
-                    HStack(spacing: 6) {
-                        Text(documentTypeTitle(document.type))
-                        Text("v\(document.version)")
-                        if let updatedAt = document.updatedAt {
-                            Text(updatedAt, style: .date)
-                        }
+            ScrollView {
+                LazyVStack(spacing: 7) {
+                    ForEach(viewModel.documents) { document in
+                        documentRow(document)
                     }
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
                 }
-                .padding(.vertical, 5)
-                .tag(document.id)
+                .padding(8)
             }
-            .listStyle(.sidebar)
+            .background(AppPalette.canvas)
         }
         .workspaceFill()
+        .background(AppPalette.surface)
+    }
+
+    private func documentRow(_ document: ProjectRequirementDocument) -> some View {
+        let selected = document.id == viewModel.selectedDocumentID
+        return Button {
+            viewModel.selectedDocumentID = document.id
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(document.title)
+                    .appFont(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                HStack(spacing: 6) {
+                    Text(documentTypeTitle(document.type))
+                    Text("v\(document.version)")
+                    if let updatedAt = document.updatedAt {
+                        Text(updatedAt, style: .date)
+                    }
+                }
+                .appFont(.caption2)
+                .foregroundStyle(.secondary)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                selected ? Color.accentColor.opacity(0.12) : AppPalette.surface,
+                in: RoundedRectangle(cornerRadius: 9)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 9)
+                    .stroke(selected ? Color.accentColor.opacity(0.5) : AppPalette.border.opacity(0.65))
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
@@ -66,7 +92,7 @@ struct ProjectPlanDocumentsView: View {
             VStack(spacing: 0) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 5) {
-                        Text(document.title).font(.headline)
+                        Text(document.title).appFont(.headline)
                         HStack(spacing: 7) {
                             StatusCapsule(title: documentTypeTitle(document.type), color: AppPalette.ai)
                             StatusCapsule(title: document.format, color: .secondary)
@@ -84,6 +110,7 @@ struct ProjectPlanDocumentsView: View {
                         .frame(maxWidth: .infinity, alignment: .center)
                 }
                 .workspaceFill(alignment: .topLeading)
+                .background(AppPalette.surface)
             }
         } else {
             ContentUnavailableView("选择一份文档", systemImage: "doc.text")

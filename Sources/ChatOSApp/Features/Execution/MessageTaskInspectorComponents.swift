@@ -6,8 +6,8 @@ struct TaskInspectorTitle: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(task.title).font(.title3.weight(.semibold))
-            Text(task.id).font(.caption.monospaced()).foregroundStyle(.tertiary)
+            Text(task.title).appFont(.title3.weight(.semibold))
+            Text(task.id).appFont(.caption.monospaced()).foregroundStyle(.tertiary)
         }
     }
 }
@@ -17,7 +17,7 @@ struct TaskRunEventTimeline: View {
 
     var body: some View {
         LazyVStack(alignment: .leading, spacing: 12) {
-            Text("运行事件 · \(events.count)").font(.subheadline.weight(.semibold))
+            Text("运行事件 · \(events.count)").appFont(.subheadline.weight(.semibold))
             ForEach(events) { event in
                 HStack(alignment: .top, spacing: 10) {
                     Circle()
@@ -26,17 +26,17 @@ struct TaskRunEventTimeline: View {
                         .padding(.top, 6)
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Text(event.eventType).font(.caption.weight(.semibold))
+                            Text(event.eventType).appFont(.caption.weight(.semibold))
                             Spacer()
                             if let createdAt = event.createdAt {
                                 Text(createdAt, style: .time)
-                                    .font(.caption2)
+                                    .appFont(.caption2)
                                     .foregroundStyle(.tertiary)
                             }
                         }
                         if let message = event.message {
                             Text(message)
-                                .font(.caption)
+                                .appFont(.caption)
                                 .foregroundStyle(.secondary)
                                 .textSelection(.enabled)
                         }

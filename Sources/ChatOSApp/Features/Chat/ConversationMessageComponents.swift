@@ -10,12 +10,12 @@ struct UserTurnMessageView: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "person.crop.circle.fill")
                 .foregroundStyle(.secondary)
-                .font(.title3)
+                .appFont(.title3)
             VStack(alignment: .leading, spacing: 9) {
                 HStack {
-                    Text("你").font(.caption.weight(.semibold))
+                    Text("你").appFont(.caption.weight(.semibold))
                     Text(turn.userMessage.createdAt, style: .time)
-                        .font(.caption2)
+                        .appFont(.caption2)
                         .foregroundStyle(.tertiary)
                 }
                 Text(turn.userMessage.text)
@@ -70,14 +70,14 @@ struct AssistantReplyView: View {
     var agentIcon: some View {
         Image(systemName: "sparkles")
             .foregroundStyle(AppPalette.ai)
-            .font(.title3)
+            .appFont(.title3)
     }
 
     var replyHeader: some View {
         HStack {
-            Text("叽咕狸").font(.caption.weight(.semibold))
+            Text("叽咕狸").appFont(.caption.weight(.semibold))
             Text(reply.message.createdAt, style: .time)
-                .font(.caption2)
+                .appFont(.caption2)
                 .foregroundStyle(.tertiary)
         }
     }
@@ -92,12 +92,12 @@ struct TaskAgentReplyView: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "sparkles")
                 .foregroundStyle(AppPalette.ai)
-                .font(.title3)
+                .appFont(.title3)
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Text("叽咕狸").font(.caption.weight(.semibold))
+                    Text("叽咕狸").appFont(.caption.weight(.semibold))
                     Text(reply.message.createdAt, style: .time)
-                        .font(.caption2)
+                        .appFont(.caption2)
                         .foregroundStyle(.tertiary)
                     if let callback = reply.taskCallback {
                         StatusCapsule(title: statusTitle(callback.status), color: statusColor(callback.status))
@@ -131,7 +131,7 @@ struct TaskAgentReplyView: View {
             onToggleInspector(section)
         } label: {
             Label(title, systemImage: icon)
-                .font(.caption.weight(.medium))
+                .appFont(.caption.weight(.medium))
                 .padding(.horizontal, 9)
                 .padding(.vertical, 5)
                 .foregroundStyle(isSelected ? Color.white : AppPalette.ai)

@@ -11,7 +11,7 @@ struct LocalConnectorPluginsView: View {
                 TextField("搜索 Plugin、Skill 或发布者", text: $searchText)
                     .textFieldStyle(.roundedBorder)
                 Text("\(filteredPlugins.count) 项")
-                    .font(.caption.monospacedDigit())
+                    .appFont(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
             .padding(14)
@@ -55,15 +55,15 @@ struct LocalConnectorPluginsView: View {
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 11) {
                 Image(systemName: "puzzlepiece.extension.fill")
-                    .font(.system(size: 18))
+                    .appFont(.system(size: 18))
                     .foregroundStyle(.tint)
                     .frame(width: 38, height: 38)
                     .background(.tint.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
                 VStack(alignment: .leading, spacing: 3) {
                     Text(plugin.displayName)
-                        .font(.headline)
+                        .appFont(.headline)
                     Text("\(plugin.publisher) · \(plugin.latestVersion)")
-                        .font(.caption)
+                        .appFont(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -85,19 +85,19 @@ struct LocalConnectorPluginsView: View {
                 }
             }
             Text(plugin.description)
-                .font(.callout)
+                .appFont(.callout)
                 .foregroundStyle(.secondary)
                 .lineLimit(3)
                 .frame(maxWidth: .infinity, minHeight: 48, alignment: .topLeading)
             HStack {
                 Text(plugin.category)
-                    .font(.caption2.weight(.medium))
+                    .appFont(.caption2.weight(.medium))
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)
                     .background(.quaternary, in: Capsule())
                 if plugin.updateAvailable {
                     Label("有更新", systemImage: "arrow.down.circle.fill")
-                        .font(.caption2)
+                        .appFont(.caption2)
                         .foregroundStyle(.blue)
                 }
                 Spacer()

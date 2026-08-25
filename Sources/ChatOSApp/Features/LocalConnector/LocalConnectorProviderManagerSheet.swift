@@ -49,11 +49,11 @@ struct LocalConnectorProviderManagerSheet: View {
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(isCreating ? "添加供应商" : editingProvider == nil ? "模型供应商" : "修改供应商")
-                    .font(.title2.weight(.semibold))
+                    .appFont(.title2.weight(.semibold))
                 Text(isCreating || editingProvider != nil
                      ? "保存供应商连接信息和模型能力。"
                      : "供应商负责凭据、Base URL 和模型目录同步。")
-                    .font(.caption)
+                    .appFont(.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer()
@@ -98,26 +98,26 @@ struct LocalConnectorProviderManagerSheet: View {
                     .background(.tint.opacity(0.09), in: RoundedRectangle(cornerRadius: 10))
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 8) {
-                        Text(provider.name).font(.headline)
+                        Text(provider.name).appFont(.headline)
                         statusBadge(provider.enabled ? "已启用" : "已停用", color: provider.enabled ? .green : .secondary)
                         statusBadge(provider.hasAPIKey ? "凭据已保存" : "缺少凭据", color: provider.hasAPIKey ? .green : .orange)
                     }
                     Text("\(provider.provider) · Prompt: \(provider.promptVendor)")
-                        .font(.caption)
+                        .appFont(.caption)
                         .foregroundStyle(.secondary)
                     Text(provider.baseURL)
-                        .font(.caption.monospaced())
+                        .appFont(.caption.monospaced())
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
                 }
                 Spacer()
                 Text("\(provider.importedModelCount) 个模型")
-                    .font(.caption.monospacedDigit())
+                    .appFont(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
             if let error = provider.lastSyncError, !error.isEmpty {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
+                    .appFont(.caption)
                     .foregroundStyle(.orange)
                     .textSelection(.enabled)
             }
@@ -157,7 +157,7 @@ struct LocalConnectorProviderManagerSheet: View {
 
     private func statusBadge(_ title: String, color: Color) -> some View {
         Text(title)
-            .font(.caption2.weight(.medium))
+            .appFont(.caption2.weight(.medium))
             .foregroundStyle(color)
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
@@ -166,7 +166,7 @@ struct LocalConnectorProviderManagerSheet: View {
 
     private func capabilityBadge(_ title: String, enabled: Bool) -> some View {
         Label(title, systemImage: enabled ? "checkmark.circle.fill" : "circle")
-            .font(.caption2)
+            .appFont(.caption2)
             .foregroundStyle(enabled ? .secondary : .tertiary)
     }
 }
@@ -217,7 +217,7 @@ private struct LocalConnectorProviderEditor: View {
             VStack(alignment: .leading, spacing: 18) {
                 if let validationMessage {
                     Label(validationMessage, systemImage: "exclamationmark.triangle.fill")
-                        .font(.callout)
+                        .appFont(.callout)
                         .foregroundStyle(.orange)
                 }
                 GroupBox("连接信息") {
@@ -282,7 +282,7 @@ private struct LocalConnectorProviderEditor: View {
     private func editorRow<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         GridRow {
             Text(title)
-                .font(.callout)
+                .appFont(.callout)
                 .foregroundStyle(.secondary)
                 .frame(width: 110, alignment: .trailing)
             content()

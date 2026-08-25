@@ -15,11 +15,11 @@ struct VisualSessionOverlay: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(session.title)
-                            .font(.caption.weight(.semibold))
+                            .appFont(.caption.weight(.semibold))
                         HStack(spacing: 5) {
                             Circle().fill(.green).frame(width: 6, height: 6)
                             Text(session.targetApplication)
-                                .font(.caption2)
+                                .appFont(.caption2)
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -43,7 +43,7 @@ struct VisualSessionOverlay: View {
                         Text("每日记录")
                         Text("归档")
                     }
-                    .font(.caption2)
+                    .appFont(.caption2)
                     .foregroundStyle(.secondary)
                     .padding(14)
                     .frame(width: 105)
@@ -52,13 +52,13 @@ struct VisualSessionOverlay: View {
 
                     VStack(alignment: .leading, spacing: 12) {
                         Text("项目笔记")
-                            .font(.subheadline.weight(.semibold))
+                            .appFont(.subheadline.weight(.semibold))
                         Divider().opacity(0.2)
                         Text("整理范围")
-                            .font(.caption.weight(.semibold))
+                            .appFont(.caption.weight(.semibold))
                             .foregroundStyle(Color(red: 0.73, green: 0.70, blue: 1.0))
                         Text("按实际主题迁移 Markdown 笔记，原始文件保持只读。")
-                            .font(.caption2)
+                            .appFont(.caption2)
                             .foregroundStyle(.secondary)
                     }
                     .padding(14)
@@ -73,7 +73,7 @@ struct VisualSessionOverlay: View {
                     Spacer()
                     Text("仅在本机显示")
                 }
-                .font(.caption2)
+                .appFont(.caption2)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 10)
                 .frame(height: 28)
@@ -91,9 +91,9 @@ struct VisualSessionOverlay: View {
                 HStack(spacing: 8) {
                     Circle().fill(.green).frame(width: 7, height: 7)
                     Text(session.title)
-                        .font(.caption.weight(.semibold))
+                        .appFont(.caption.weight(.semibold))
                     Image(systemName: "chevron.up")
-                        .font(.caption2)
+                        .appFont(.caption2)
                 }
                 .padding(.horizontal, 13)
                 .frame(width: 168, height: 44)

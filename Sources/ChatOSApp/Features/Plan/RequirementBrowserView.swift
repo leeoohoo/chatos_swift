@@ -19,7 +19,7 @@ struct RequirementBrowserView: View {
             .scrollIndicators(.visible)
             .workspaceFill(alignment: .topLeading)
         }
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.55))
+        .background(AppPalette.canvas)
         .workspaceFill()
     }
 
@@ -40,11 +40,11 @@ struct RequirementBrowserView: View {
                         .foregroundStyle(.secondary)
                 }
                 Text(column.title)
-                    .font(.caption.weight(.semibold))
+                    .appFont(.caption.weight(.semibold))
                     .lineLimit(1)
                 Spacer()
                 Text("\(column.requirements.count)")
-                    .font(.caption2.monospacedDigit())
+                    .appFont(.caption2.monospacedDigit())
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
@@ -64,7 +64,7 @@ struct RequirementBrowserView: View {
                 .padding(8)
             }
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(AppPalette.surface)
         .overlay(alignment: .trailing) { Divider() }
         .workspaceFill(alignment: .top)
     }
@@ -83,27 +83,27 @@ struct RequirementBrowserView: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .firstTextBaseline, spacing: 7) {
                     Text(requirement.title)
-                        .font(.subheadline.weight(.semibold))
+                        .appFont(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(2)
                     Spacer(minLength: 6)
                     Text(taskCount.map(String.init) ?? "-")
-                        .font(.caption2.monospacedDigit())
+                        .appFont(.caption2.monospacedDigit())
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Color(nsColor: .windowBackgroundColor), in: Capsule())
+                        .background(AppPalette.surface, in: Capsule())
                         .overlay { Capsule().stroke(.separator.opacity(0.55)) }
                     if childCount > 0 {
                         Image(systemName: "chevron.right")
-                            .font(.caption2.weight(.bold))
+                            .appFont(.caption2.weight(.bold))
                             .foregroundStyle(.tertiary)
                     }
                 }
 
                 if let summary = requirement.summary, !summary.isEmpty {
                     Text(summary)
-                        .font(.caption)
+                        .appFont(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                 }
@@ -153,7 +153,7 @@ struct RequirementBrowserView: View {
     ) -> some View {
         if !requirements.isEmpty {
             Text("\(title)：\(previewText(requirements))")
-                .font(.caption2)
+                .appFont(.caption2)
                 .foregroundStyle(color)
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -180,7 +180,7 @@ private struct PlanMetadataPill: View {
 
     var body: some View {
         Text(title)
-            .font(.caption2)
+            .appFont(.caption2)
             .foregroundStyle(color)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
@@ -196,14 +196,14 @@ private struct PlanStat: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(title).font(.caption2).foregroundStyle(.secondary)
-            Text("\(value)").font(.subheadline.weight(.semibold)).foregroundStyle(color)
+            Text(title).appFont(.caption2).foregroundStyle(.secondary)
+            Text("\(value)").appFont(.subheadline.weight(.semibold)).foregroundStyle(color)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
-        .overlay { RoundedRectangle(cornerRadius: 8).stroke(.separator.opacity(0.6)) }
+        .background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 8))
+        .overlay { RoundedRectangle(cornerRadius: 8).stroke(AppPalette.border.opacity(0.75)) }
     }
 }
 
@@ -212,7 +212,7 @@ struct PlanStatusBadge: View {
 
     var body: some View {
         Text(title)
-            .font(.caption2.weight(.medium))
+            .appFont(.caption2.weight(.medium))
             .foregroundStyle(color)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)

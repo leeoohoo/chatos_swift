@@ -68,7 +68,7 @@ struct SettingsView: View {
                 }
             }
             Section("显示") {
-                LabeledContent("界面字体大小") {
+                LabeledContent("字体大小") {
                     HStack(spacing: 10) {
                         Image(systemName: "textformat.size.smaller")
                             .foregroundStyle(.secondary)
@@ -77,17 +77,11 @@ struct SettingsView: View {
                         Image(systemName: "textformat.size.larger")
                             .foregroundStyle(.secondary)
                         Text("\(Int(model.interfaceFontSize)) pt")
-                            .font(.caption.monospacedDigit())
+                            .appFont(.caption.monospacedDigit())
                             .foregroundStyle(.secondary)
                             .frame(width: 42, alignment: .trailing)
+                        Button("恢复默认") { model.interfaceFontSize = 14 }
                     }
-                }
-                HStack {
-                    Text("调整后会立即应用到主界面、项目、Plan、任务详情和设置。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button("恢复默认") { model.interfaceFontSize = 14 }
                 }
             }
             Section("账号") {
@@ -101,6 +95,8 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .background(AppPalette.canvas)
         .navigationTitle("常规")
         .padding()
     }
@@ -108,17 +104,17 @@ struct SettingsView: View {
     private var settingsHeader: some View {
         HStack(spacing: 14) {
             Image(systemName: selection.systemImage)
-                .font(.system(size: 21, weight: .medium))
+                .appFont(.system(size: 21, weight: .medium))
                 .foregroundStyle(.tint)
                 .frame(width: 42, height: 42)
                 .background(.tint.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
             VStack(alignment: .leading, spacing: 3) {
                 Text(selection.eyebrow)
-                    .font(.caption2.weight(.semibold))
+                    .appFont(.caption2.weight(.semibold))
                     .tracking(0.8)
                     .foregroundStyle(.secondary)
-                Text(selection.title).font(.title2.weight(.semibold))
-                Text(selection.description).font(.subheadline).foregroundStyle(.secondary)
+                Text(selection.title).appFont(.title2.weight(.semibold))
+                Text(selection.description).appFont(.subheadline).foregroundStyle(.secondary)
             }
             Spacer()
             if model.localConnectorControl.isLoading
@@ -157,7 +153,7 @@ struct SettingsView: View {
     private func banner(_ text: String, image: String, tint: Color) -> some View {
         HStack(spacing: 9) {
             Image(systemName: image).foregroundStyle(tint)
-            Text(text).font(.callout).textSelection(.enabled)
+            Text(text).appFont(.callout).textSelection(.enabled)
             Spacer()
             Button("关闭", systemImage: "xmark", action: model.localConnectorControl.clearMessages)
                 .labelStyle(.iconOnly)

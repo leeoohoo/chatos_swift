@@ -5,7 +5,7 @@ struct TerminalTabsView: View {
         HStack(spacing: 8) {
             HStack(spacing: 8) {
                 Circle().fill(.green).frame(width: 7, height: 7)
-                Text("test_project").font(.subheadline.weight(.medium))
+                Text("test_project").appFont(.subheadline.weight(.medium))
                 Button("关闭", systemImage: "xmark") {}
                     .labelStyle(.iconOnly)
                     .buttonStyle(.plain)
@@ -23,7 +23,7 @@ struct TerminalTabsView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(AppPalette.surfaceSubtle)
     }
 }
 
@@ -33,17 +33,17 @@ struct TerminalHeaderView: View {
     var body: some View {
         HStack {
             Label(terminal.workingDirectory, systemImage: "folder")
-                .font(.caption.monospaced())
+                .appFont(.caption.monospaced())
                 .lineLimit(1)
                 .truncationMode(.middle)
             Spacer()
             Circle().fill(.green).frame(width: 7, height: 7)
-            Text("已连接").font(.caption).foregroundStyle(.secondary)
+            Text("已连接").appFont(.caption).foregroundStyle(.secondary)
             StatusCapsule(title: "zsh", color: .secondary)
         }
         .padding(.horizontal, 18)
         .frame(height: 48)
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.55))
+        .background(AppPalette.canvas)
     }
 }
 
@@ -60,11 +60,11 @@ struct TerminalStatusBar: View {
             Spacer()
             Text(terminal.isRunning ? "命令运行中" : "就绪")
         }
-        .font(.caption2)
+        .appFont(.caption2)
         .foregroundStyle(.secondary)
         .padding(.horizontal, 14)
         .frame(height: 28)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(AppPalette.surfaceSubtle)
     }
 }
 

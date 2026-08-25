@@ -9,10 +9,11 @@ struct ComposerView: View {
             input
         }
         .padding(14)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 13))
+        .background(AppPalette.surfaceSubtle, in: RoundedRectangle(cornerRadius: 13))
         .overlay {
-            RoundedRectangle(cornerRadius: 13).stroke(.separator, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 13).stroke(AppPalette.border, lineWidth: 1)
         }
+        .shadow(color: .black.opacity(0.055), radius: 10, y: 3)
     }
 
     private var controls: some View {
@@ -31,7 +32,7 @@ struct ComposerView: View {
                     conversation.setPlanModeEnabled(!conversation.planModeEnabled)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(conversation.planModeEnabled ? AppPalette.ai : .secondary.opacity(0.3))
+                .tint(conversation.planModeEnabled ? AppPalette.ai : AppPalette.idleControl)
                 .help(
                     conversation.planModeEnabled
                         ? "开启后，AI 会先通过 Task Runner 生成待确认的任务图。"
@@ -43,7 +44,7 @@ struct ComposerView: View {
                 conversation.setReasoningEnabled(!conversation.reasoningEnabled)
             }
             .buttonStyle(.borderedProminent)
-            .tint(conversation.reasoningEnabled ? AppPalette.ai : .secondary.opacity(0.3))
+            .tint(conversation.reasoningEnabled ? AppPalette.ai : AppPalette.idleControl)
             .disabled(conversation.isUpdatingRuntimeSettings)
             Spacer()
         }
@@ -66,7 +67,7 @@ struct ComposerView: View {
                     if conversation.isSending {
                         ProgressView().controlSize(.small)
                     } else {
-                        Image(systemName: "arrow.up").font(.headline)
+                        Image(systemName: "arrow.up").appFont(.headline)
                     }
                 }
                 .frame(width: 30, height: 30)
@@ -77,6 +78,14 @@ struct ComposerView: View {
                 conversation.isSending
                     || conversation.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             )
+        }
+        .padding(.leading, 13)
+        .padding(.trailing, 7)
+        .padding(.vertical, 7)
+        .background(AppPalette.inputSurface, in: RoundedRectangle(cornerRadius: 11))
+        .overlay {
+            RoundedRectangle(cornerRadius: 11)
+                .stroke(AppPalette.ai.opacity(0.24), lineWidth: 1)
         }
     }
 }

@@ -61,7 +61,7 @@ struct LocalConnectorApprovalsView: View {
             }
             .pickerStyle(.segmented)
             Text(approvalModeDescription)
-                .font(.caption)
+                .appFont(.caption)
                 .foregroundStyle(.secondary)
         }
     }
@@ -91,29 +91,29 @@ struct LocalConnectorApprovalsView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(approval.risk.uppercased())
-                    .font(.caption2.weight(.bold))
+                    .appFont(.caption2.weight(.bold))
                     .foregroundStyle(riskColor(approval.risk))
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)
                     .background(riskColor(approval.risk).opacity(0.1), in: Capsule())
                 Text(approval.source)
-                    .font(.caption)
+                    .appFont(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
                 Text(approval.createdAt)
-                    .font(.caption2)
+                    .appFont(.caption2)
                     .foregroundStyle(.tertiary)
             }
             Text(approval.command)
-                .font(.system(.callout, design: .monospaced))
+                .appFont(.system(.callout, design: .monospaced))
                 .textSelection(.enabled)
             Text(approval.cwd)
-                .font(.caption.monospaced())
+                .appFont(.caption.monospaced())
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
             if let reason = approval.reason, !reason.isEmpty {
                 Text(reason)
-                    .font(.caption)
+                    .appFont(.caption)
                     .foregroundStyle(.secondary)
             }
             HStack {
@@ -153,15 +153,15 @@ struct LocalConnectorApprovalsView: View {
                                 .frame(width: 18)
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(entry.command)
-                                    .font(.system(.callout, design: .monospaced))
+                                    .appFont(.system(.callout, design: .monospaced))
                                     .lineLimit(2)
                                 Text("\(entry.source) · \(entry.createdAt)")
-                                    .font(.caption2)
+                                    .appFont(.caption2)
                                     .foregroundStyle(.secondary)
                             }
                             Spacer()
                             Text(entry.decision)
-                                .font(.caption.weight(.medium))
+                                .appFont(.caption.weight(.medium))
                                 .foregroundStyle(decisionColor(entry.decision))
                         }
                         .padding(.vertical, 8)

@@ -51,16 +51,16 @@ private struct LocalConnectorTaskModelRow: View {
                     .frame(width: 34, height: 34)
                     .background(.tint.opacity(draft.enabled ? 0.1 : 0.04), in: RoundedRectangle(cornerRadius: 9))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(model.name).font(.headline)
+                    Text(model.name).appFont(.headline)
                     Text("\(model.provider) · \(model.modelName)")
-                        .font(.caption.monospaced())
+                        .appFont(.caption.monospaced())
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
                 }
                 Spacer()
                 if !model.hasAPIKey {
                     Label("缺少凭据", systemImage: "key.slash")
-                        .font(.caption)
+                        .appFont(.caption)
                         .foregroundStyle(.orange)
                 }
                 Toggle("启用", isOn: $draft.enabled)
@@ -105,7 +105,7 @@ private struct LocalConnectorTaskModelRow: View {
 
     private func fieldTitle(_ title: String) -> some View {
         Text(title)
-            .font(.caption)
+            .appFont(.caption)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
     }

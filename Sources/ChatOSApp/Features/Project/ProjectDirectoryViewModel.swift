@@ -12,6 +12,7 @@ final class ProjectDirectoryViewModel: ObservableObject {
         var id: String { entry.path }
         let entry: ProjectFileEntry
         let depth: Int
+        let isExpanded: Bool
     }
 
     @Published private(set) var visibleEntries: [VisibleEntry] = []
@@ -36,20 +37,28 @@ final class ProjectDirectoryViewModel: ObservableObject {
     let rootPath: String?
     private let service: any ProjectFilesystemServicing
     private let codeNavigationService: any ProjectCodeNavigationServicing
+    private let expansionStateStore: any ProjectDirectoryExpansionStateStoring
     private var childrenByPath: [String: [ProjectFileEntry]] = [:]
-    private var expandedPaths: Set<String> = []
+    private var expandedPaths: Set<String>
     private var searchTask: Task<Void, Never>?
     private var navigationTask: Task<Void, Never>?
     private var navigationHistory: [NavigationPoint] = []
 
     init(
+        projectID: String,
         rootPath: String?,
         service: any ProjectFilesystemServicing,
         codeNavigationService: any ProjectCodeNavigationServicing
     ) {
+        let expansionStateStore = ProjectDirectoryExpansionStateStore(
+            projectID: projectID,
+            rootPath: rootPath
+        )
         self.rootPath = rootPath
         self.service = service
         self.codeNavigationService = codeNavigationService
+        self.expansionStateStore = expansionStateStore
+        self.expandedPaths = expansionStateStore.loadExpandedPaths()
     }
 
     deinit {
@@ -70,7 +79,6 @@ final class ProjectDirectoryViewModel: ObservableObject {
     func refresh() async {
         guard let rootPath = rootPath?.trimmedNonEmpty else { return }
         childrenByPath.removeAll()
-        expandedPaths.removeAll()
         selectedFile = nil
         selectedPath = nil
         selectedLine = nil
@@ -82,9 +90,11 @@ final class ProjectDirectoryViewModel: ObservableObject {
         if entry.isDirectory {
             if expandedPaths.contains(entry.path) {
                 expandedPaths.remove(entry.path)
+                persistExpandedPaths()
                 rebuildVisibleEntries()
             } else {
                 expandedPaths.insert(entry.path)
+                persistExpandedPaths()
                 if childrenByPath[entry.path] == nil {
                     await loadChildren(of: entry.path, forceRefresh: false)
                 } else {
@@ -102,6 +112,7 @@ final class ProjectDirectoryViewModel: ObservableObject {
             searchResults = []
             contentSearchResults = []
             expandedPaths.insert(entry.path)
+            persistExpandedPaths()
             await loadChildren(of: entry.path, forceRefresh: false)
         } else {
             await selectFile(entry, targetLine: nil)
@@ -300,6 +311,7 @@ final class ProjectDirectoryViewModel: ObservableObject {
                 try await service.createFile(parentPath: parent, name: name)
             }
             expandedPaths.insert(parent)
+            persistExpandedPaths()
             await loadChildren(of: parent, forceRefresh: true)
         } catch {
             errorMessage = error.localizedDescription
@@ -312,6 +324,10 @@ final class ProjectDirectoryViewModel: ObservableObject {
         do {
             try await service.deleteEntry(path: selectedPath, recursive: selected?.isDirectory == true)
             let parent = parentPath(of: selectedPath)
+            expandedPaths = expandedPaths.filter { path in
+                path != selectedPath && !path.hasPrefix(selectedPath + "/")
+            }
+            persistExpandedPaths()
             self.selectedPath = nil
             selectedFile = nil
             selectedLine = nil
@@ -376,6 +392,7 @@ final class ProjectDirectoryViewModel: ObservableObject {
         do {
             let listing = try await service.listEntries(path: path, forceRefresh: forceRefresh)
             childrenByPath[path] = listing.entries.sorted(by: entrySort)
+            await restoreExpandedDescendants(of: path, forceRefresh: forceRefresh)
             rebuildVisibleEntries()
         } catch {
             errorMessage = error.localizedDescription
@@ -390,6 +407,7 @@ final class ProjectDirectoryViewModel: ObservableObject {
             do {
                 let listing = try await service.listEntries(path: path, forceRefresh: attempt > 0)
                 childrenByPath[path] = listing.entries.sorted(by: entrySort)
+                await restoreExpandedDescendants(of: path, forceRefresh: attempt > 0)
                 rebuildVisibleEntries()
                 isLoading = false
                 return
@@ -423,7 +441,11 @@ final class ProjectDirectoryViewModel: ObservableObject {
         var result: [VisibleEntry] = []
         func appendChildren(of path: String, depth: Int) {
             for entry in childrenByPath[path] ?? [] {
-                result.append(VisibleEntry(entry: entry, depth: depth))
+                result.append(VisibleEntry(
+                    entry: entry,
+                    depth: depth,
+                    isExpanded: entry.isDirectory && expandedPaths.contains(entry.path)
+                ))
                 if entry.isDirectory, expandedPaths.contains(entry.path) {
                     appendChildren(of: entry.path, depth: depth + 1)
                 }
@@ -431,6 +453,29 @@ final class ProjectDirectoryViewModel: ObservableObject {
         }
         appendChildren(of: rootPath, depth: 0)
         visibleEntries = result
+    }
+
+    private func restoreExpandedDescendants(of path: String, forceRefresh: Bool) async {
+        let expandedChildren = (childrenByPath[path] ?? []).filter {
+            $0.isDirectory && expandedPaths.contains($0.path)
+        }
+        for entry in expandedChildren {
+            do {
+                let listing = try await service.listEntries(
+                    path: entry.path,
+                    forceRefresh: forceRefresh
+                )
+                childrenByPath[entry.path] = listing.entries.sorted(by: entrySort)
+                await restoreExpandedDescendants(of: entry.path, forceRefresh: forceRefresh)
+            } catch {
+                // 保留用户的展开偏好；目录暂时不可访问时，下次进入仍可重试。
+                continue
+            }
+        }
+    }
+
+    private func persistExpandedPaths() {
+        expansionStateStore.saveExpandedPaths(expandedPaths)
     }
 
     private func entrySort(_ lhs: ProjectFileEntry, _ rhs: ProjectFileEntry) -> Bool {

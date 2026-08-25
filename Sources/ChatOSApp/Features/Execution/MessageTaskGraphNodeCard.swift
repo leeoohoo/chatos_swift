@@ -18,25 +18,25 @@ struct MessageTaskGraphNodeCard: View {
                     .fill(statusColor)
                     .frame(width: scaled(8), height: scaled(8))
                 Text(statusTitle)
-                    .font(.system(size: scaledFont(11), weight: .medium))
+                    .appFont(.system(size: scaledFont(11), weight: .medium))
                     .foregroundStyle(statusColor)
                 if node.isCurrentMessage {
                     Text("当前消息")
-                        .font(.system(size: scaledFont(10), weight: .semibold))
+                        .appFont(.system(size: scaledFont(10), weight: .semibold))
                         .foregroundStyle(AppPalette.ai)
                 }
                 Spacer()
                 if node.groupedTasks.count > 1 {
                     Text("\(node.groupedTasks.count) 阶段")
-                        .font(.system(size: scaledFont(10)))
+                        .appFont(.system(size: scaledFont(10)))
                         .foregroundStyle(.secondary)
                 }
             }
             Text(node.task.title)
-                .font(.system(size: scaledFont(13), weight: .semibold))
+                .appFont(.system(size: scaledFont(13), weight: .semibold))
                 .lineLimit(2)
             Text(node.task.description ?? node.task.objective ?? "暂无任务描述")
-                .font(.system(size: scaledFont(11)))
+                .appFont(.system(size: scaledFont(11)))
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
             HStack(spacing: scaled(6)) {
@@ -78,7 +78,7 @@ struct MessageTaskGraphNodeCard: View {
     private func actionButton(_ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: scaledFont(10), weight: .medium))
+                .appFont(.system(size: scaledFont(10), weight: .medium))
                 .padding(.horizontal, scaled(7))
                 .padding(.vertical, scaled(3))
                 .background(

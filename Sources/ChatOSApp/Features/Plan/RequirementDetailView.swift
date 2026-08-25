@@ -22,7 +22,7 @@ struct RequirementDetailView: View {
                         ProgressView()
                             .controlSize(.large)
                             .padding(18)
-                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                            .background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 12))
                     }
                 }
             } else {
@@ -41,11 +41,11 @@ struct RequirementDetailView: View {
                     StatusCapsule(title: "P\(requirement.priority)", color: .orange)
                 }
                 Text(requirement.title)
-                    .font(.title2.weight(.semibold))
+                    .appFont(.title2.weight(.semibold))
                     .textSelection(.enabled)
                 if let updatedAt = requirement.updatedAt {
                     Text("更新于 \(updatedAt.formatted(date: .abbreviated, time: .shortened))")
-                        .font(.caption)
+                        .appFont(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -155,14 +155,14 @@ private struct PlanDetailTabBar: View {
                 Text(section.rawValue)
                 if let count {
                     Text("\(count)")
-                        .font(.caption2.monospacedDigit())
+                        .appFont(.caption2.monospacedDigit())
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1)
                         .background(.quaternary, in: Capsule())
                 }
             }
-            .font(.subheadline.weight(viewModel.selectedSection == section ? .semibold : .regular))
+            .appFont(.subheadline.weight(viewModel.selectedSection == section ? .semibold : .regular))
             .foregroundStyle(viewModel.selectedSection == section ? Color.primary : Color.secondary)
             .padding(.horizontal, 11)
             .frame(height: 42)
@@ -182,7 +182,7 @@ private struct RequirementRelationsCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Label("需求关系", systemImage: "link")
-                .font(.subheadline.weight(.semibold))
+                .appFont(.subheadline.weight(.semibold))
             relation("前置需求", values: viewModel.selectedPrerequisites, color: .orange, empty: "无")
             relation("后续需求", values: viewModel.selectedDependents, color: AppPalette.ai, empty: "无")
             relation("子需求", values: viewModel.selectedChildren, color: AppPalette.ai, empty: "无")
@@ -190,8 +190,8 @@ private struct RequirementRelationsCard: View {
         }
         .padding(15)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 11))
-        .overlay { RoundedRectangle(cornerRadius: 11).stroke(.separator.opacity(0.7)) }
+        .background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 11))
+        .overlay { RoundedRectangle(cornerRadius: 11).stroke(AppPalette.border.opacity(0.8)) }
     }
 
     private func relation(
@@ -202,18 +202,18 @@ private struct RequirementRelationsCard: View {
     ) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Text(title)
-                .font(.caption.weight(.medium))
+                .appFont(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
                 .frame(width: 72, alignment: .leading)
             if values.isEmpty {
                 Text(empty)
-                    .font(.caption)
+                    .appFont(.caption)
                     .foregroundStyle(.tertiary)
             } else {
                 FlowLayout(spacing: 6) {
                     ForEach(values.prefix(12)) { requirement in
                         Text(requirement.title)
-                            .font(.caption)
+                            .appFont(.caption)
                             .foregroundStyle(color)
                             .lineLimit(1)
                             .padding(.horizontal, 7)
@@ -222,7 +222,7 @@ private struct RequirementRelationsCard: View {
                     }
                     if values.count > 12 {
                         Text("+\(values.count - 12)")
-                            .font(.caption.weight(.medium))
+                            .appFont(.caption.weight(.medium))
                             .foregroundStyle(color)
                     }
                 }
@@ -239,13 +239,13 @@ private struct RequirementMarkdownSection: View {
         if let value, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             VStack(alignment: .leading, spacing: 9) {
                 Text(title)
-                    .font(.caption.weight(.semibold))
+                    .appFont(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                 MarkdownDocumentView(markdown: value)
                     .padding(14)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(nsColor: .controlBackgroundColor).opacity(0.65), in: RoundedRectangle(cornerRadius: 10))
-                    .overlay { RoundedRectangle(cornerRadius: 10).stroke(.separator.opacity(0.55)) }
+                    .background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 10))
+                    .overlay { RoundedRectangle(cornerRadius: 10).stroke(AppPalette.border.opacity(0.72)) }
             }
         }
     }

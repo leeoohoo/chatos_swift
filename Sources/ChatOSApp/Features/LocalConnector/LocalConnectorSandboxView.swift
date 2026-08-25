@@ -31,7 +31,7 @@ struct LocalConnectorSandboxView: View {
 
                 if let error = settings.permissionConfigurationError {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption)
+                        .appFont(.caption)
                         .foregroundStyle(.red)
                 }
 
@@ -92,13 +92,13 @@ struct LocalConnectorSandboxView: View {
                             VStack(alignment: .leading, spacing: 5) {
                                 HStack {
                                     Text(backend.backend == "local_process" ? "本机进程" : backend.backend)
-                                        .font(.headline)
+                                        .appFont(.headline)
                                     Text(backend.status)
-                                        .font(.caption2.monospaced())
+                                        .appFont(.caption2.monospaced())
                                         .foregroundStyle(.secondary)
                                 }
                                 Text(backend.message)
-                                    .font(.caption)
+                                    .appFont(.caption)
                                     .foregroundStyle(.secondary)
                                 HStack(spacing: 8) {
                                     capability("文件隔离", enabled: backend.filesystemIsolation)
@@ -139,7 +139,7 @@ struct LocalConnectorSandboxView: View {
 
     private func capability(_ label: String, enabled: Bool) -> some View {
         Label(label, systemImage: enabled ? "checkmark" : "minus")
-            .font(.caption2)
+            .appFont(.caption2)
             .foregroundStyle(enabled ? .green : .secondary)
             .padding(.horizontal, 7)
             .padding(.vertical, 3)

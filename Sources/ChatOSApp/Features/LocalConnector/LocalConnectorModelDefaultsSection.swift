@@ -51,8 +51,8 @@ struct LocalConnectorModelDefaultsSection: View {
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(title).font(.headline)
-                    Text(subtitle).font(.caption).foregroundStyle(.secondary)
+                    Text(title).appFont(.headline)
+                    Text(subtitle).appFont(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
             }

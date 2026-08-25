@@ -7,9 +7,9 @@ struct ProjectPlanHeaderView: View {
         HStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 3) {
                 Text("Plan")
-                    .font(.headline)
+                    .appFont(.headline)
                 Text(summary)
-                    .font(.caption)
+                    .appFont(.caption)
                     .foregroundStyle(.secondary)
             }
 
@@ -44,7 +44,7 @@ struct ProjectPlanErrorBanner: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.red)
             Text(message)
-                .font(.caption)
+                .appFont(.caption)
                 .foregroundStyle(.red)
                 .lineLimit(2)
             Spacer(minLength: 12)

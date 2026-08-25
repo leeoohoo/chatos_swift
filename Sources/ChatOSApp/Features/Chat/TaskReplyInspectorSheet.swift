@@ -20,7 +20,7 @@ struct TaskReplyInlineInspectorView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {
                 Label(viewModel.section.rawValue, systemImage: sectionIcon)
-                    .font(.subheadline.weight(.semibold))
+                    .appFont(.subheadline.weight(.semibold))
                     .foregroundStyle(AppPalette.ai)
                 Spacer()
                 if viewModel.isLoading || viewModel.isLoadingModelOutput {
@@ -33,7 +33,7 @@ struct TaskReplyInlineInspectorView: View {
         }
         .padding(16)
         .frame(maxWidth: 840, alignment: .leading)
-        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
+        .background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 12))
         .overlay {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(AppPalette.ai.opacity(0.16), lineWidth: 1)
@@ -63,9 +63,9 @@ private struct TaskReplyInspectorContent: View {
         } else if let error = viewModel.errorMessage, viewModel.task == nil {
             VStack(alignment: .leading, spacing: 10) {
                 Label("任务加载失败", systemImage: "exclamationmark.triangle")
-                    .font(.subheadline.weight(.semibold))
+                    .appFont(.subheadline.weight(.semibold))
                     .foregroundStyle(.orange)
-                Text(error).font(.caption).foregroundStyle(.secondary)
+                Text(error).appFont(.caption).foregroundStyle(.secondary)
                 Button("重试", action: viewModel.load)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -95,7 +95,7 @@ private struct TaskReplyInspectorContent: View {
         )
         if let modelOutputError = viewModel.modelOutputError {
             Label("模型输出读取失败：\(modelOutputError)", systemImage: "exclamationmark.triangle")
-                .font(.caption)
+                .appFont(.caption)
                 .foregroundStyle(.orange)
         }
         if task.normalizedStatus == "blocked" || task.normalizedStatus == "failed" {
@@ -106,7 +106,7 @@ private struct TaskReplyInspectorContent: View {
     private func blockedActions(_ task: MessageTask) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Label("处理阻塞", systemImage: "exclamationmark.triangle")
-                .font(.subheadline.weight(.semibold))
+                .appFont(.subheadline.weight(.semibold))
                 .foregroundStyle(.orange)
             TextEditor(text: $viewModel.retryInstruction)
                 .frame(minHeight: 78)

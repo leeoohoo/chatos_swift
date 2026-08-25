@@ -2,13 +2,13 @@ import SwiftUI
 
 struct ResourceSidebar: View {
     @EnvironmentObject private var model: AppModel
+    @Environment(\.interfaceFontScale) private var interfaceFontScale
 
     var body: some View {
         List(selection: $model.selection) {
-            Section("联系人") {
+            Section {
                 if model.isWorkspaceLoading && model.contacts.isEmpty {
-                    ProgressView("正在加载联系人…")
-                        .controlSize(.small)
+                    loadingRow("正在加载联系人…")
                 }
                 ForEach(model.contacts) { contact in
                     resourceRow(
@@ -19,12 +19,13 @@ struct ResourceSidebar: View {
                     )
                     .tag(SidebarSelection.contact(contact.id))
                 }
+            } header: {
+                sectionHeader("联系人")
             }
 
-            Section("项目") {
+            Section {
                 if model.isWorkspaceLoading && model.projects.isEmpty {
-                    ProgressView("正在加载项目…")
-                        .controlSize(.small)
+                    loadingRow("正在加载项目…")
                 }
                 ForEach(model.projects) { project in
                     resourceRow(
@@ -35,9 +36,11 @@ struct ResourceSidebar: View {
                     )
                     .tag(SidebarSelection.project(project.id))
                 }
+            } header: {
+                sectionHeader("项目")
             }
 
-            Section("本机") {
+            Section {
                 ForEach(model.terminals) { terminal in
                     resourceRow(
                         title: terminal.title,
@@ -47,11 +50,21 @@ struct ResourceSidebar: View {
                     )
                     .tag(SidebarSelection.terminal(terminal.id))
                 }
+            } header: {
+                sectionHeader("本机")
             }
 
-            Section("远端") {
-                Label("还没有远端连接", systemImage: "network")
+            Section {
+                HStack(spacing: 10) {
+                    Image(systemName: "network")
+                        .frame(width: 18)
+                    Text("还没有远端连接")
+                        .appFont(.body)
+                }
                     .foregroundStyle(.secondary)
+                    .padding(.vertical, rowVerticalPadding)
+            } header: {
+                sectionHeader("远端")
             }
 
             if let workspaceError = model.workspaceError {
@@ -60,7 +73,7 @@ struct ResourceSidebar: View {
                         Label("资源同步失败", systemImage: "exclamationmark.triangle.fill")
                             .foregroundStyle(.orange)
                         Text(workspaceError)
-                            .font(.caption2)
+                            .appFont(.caption2)
                             .foregroundStyle(.secondary)
                         Button("重试", action: model.refreshWorkspace)
                             .controlSize(.small)
@@ -105,15 +118,36 @@ struct ResourceSidebar: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
+                    .appFont(.body.weight(.medium))
                     .lineLimit(1)
                 if let subtitle {
                     Text(subtitle)
-                        .font(.caption2)
+                        .appFont(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
             }
         }
-        .padding(.vertical, subtitle == nil ? 2 : 3)
+        .padding(.vertical, rowVerticalPadding)
+    }
+
+    private var rowVerticalPadding: CGFloat {
+        3 + max(0, interfaceFontScale - 1) * 5
+    }
+
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .appFont(.caption.weight(.semibold))
+    }
+
+    private func loadingRow(_ title: String) -> some View {
+        HStack(spacing: 9) {
+            ProgressView()
+                .controlSize(.small)
+            Text(title)
+                .appFont(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, rowVerticalPadding)
     }
 }

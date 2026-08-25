@@ -4,6 +4,12 @@ enum AppPalette {
     static let ai = Color(red: 0.43, green: 0.34, blue: 0.84)
     static let aiSoft = Color(red: 0.94, green: 0.92, blue: 1.0)
     static let selection = Color.accentColor.opacity(0.12)
+    static let canvas = Color(red: 0.985, green: 0.990, blue: 1.0)
+    static let surface = Color.white
+    static let surfaceSubtle = Color(red: 0.955, green: 0.975, blue: 1.0)
+    static let inputSurface = Color.white
+    static let border = Color(red: 0.78, green: 0.84, blue: 0.93)
+    static let idleControl = Color(red: 0.34, green: 0.47, blue: 0.68)
     static let terminalGreen = Color(red: 0.10, green: 0.62, blue: 0.28)
     static let terminalOrange = Color(red: 0.84, green: 0.39, blue: 0.08)
 }
@@ -14,7 +20,7 @@ struct StatusCapsule: View {
 
     var body: some View {
         Text(title)
-            .font(.caption.weight(.medium))
+            .appFont(.caption.weight(.medium))
             .foregroundStyle(color)
             .padding(.horizontal, 9)
             .padding(.vertical, 4)
@@ -27,7 +33,7 @@ struct SectionLabel: View {
 
     var body: some View {
         Text(title)
-            .font(.caption.weight(.semibold))
+            .appFont(.caption.weight(.semibold))
             .foregroundStyle(.secondary)
             .textCase(.uppercase)
     }
@@ -41,6 +47,6 @@ extension View {
     }
 
     func workspaceBackground() -> some View {
-        background(Color(nsColor: .windowBackgroundColor))
+        background(AppPalette.canvas)
     }
 }

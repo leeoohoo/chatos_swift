@@ -35,7 +35,7 @@ struct LocalConnectorRuntimePermissionsView: View {
                 LocalConnectorKeyValueRow(label: "Connector Gateway", value: settings.developerCloudBaseURL, monospaced: true)
                 LocalConnectorKeyValueRow(label: "Account Service", value: settings.developerUserServiceBaseURL, monospaced: true)
                 Text("Swift Native Connector 直接连接这些服务端点，不启动本机 HTTP Core。")
-                    .font(.caption)
+                    .appFont(.caption)
                     .foregroundStyle(.secondary)
             } else {
                 ProgressView("正在读取运行配置…")
@@ -67,31 +67,31 @@ struct LocalConnectorRuntimePermissionsView: View {
     private func permissionRow(_ permission: LocalConnectorSystemPermission) -> some View {
         HStack(alignment: .top, spacing: 13) {
             Image(systemName: permissionIcon(permission.id))
-                .font(.system(size: 17))
+                .appFont(.system(size: 17))
                 .foregroundStyle(permissionColor(permission.status))
                 .frame(width: 28, height: 28)
                 .background(permissionColor(permission.status).opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
             VStack(alignment: .leading, spacing: 5) {
                 HStack {
                     Text(permission.label)
-                        .font(.headline)
+                        .appFont(.headline)
                     Text(permission.statusLabel)
-                        .font(.caption2.weight(.semibold))
+                        .appFont(.caption2.weight(.semibold))
                         .foregroundStyle(permissionColor(permission.status))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(permissionColor(permission.status).opacity(0.1), in: Capsule())
                 }
                 Text(permission.summary)
-                    .font(.callout)
+                    .appFont(.callout)
                 if !permission.note.isEmpty {
                     Text(permission.note)
-                        .font(.caption)
+                        .appFont(.caption)
                         .foregroundStyle(.secondary)
                 }
                 if let error = permission.lastError {
                     Text(error)
-                        .font(.caption)
+                        .appFont(.caption)
                         .foregroundStyle(.red)
                 }
             }

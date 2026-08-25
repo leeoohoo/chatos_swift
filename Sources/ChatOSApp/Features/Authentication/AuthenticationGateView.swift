@@ -9,7 +9,7 @@ struct AuthenticationGateView<Content: View>: View {
         case .restoring:
             VStack(spacing: 14) {
                 Image(systemName: "sparkles")
-                    .font(.system(size: 36))
+                    .appFont(.system(size: 36))
                     .foregroundStyle(AppPalette.ai)
                 ProgressView("正在恢复登录状态…")
                     .controlSize(.small)

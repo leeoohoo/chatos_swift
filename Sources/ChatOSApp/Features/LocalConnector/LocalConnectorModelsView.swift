@@ -18,7 +18,7 @@ struct LocalConnectorModelsView: View {
                 actionBar
                 if let validationMessage {
                     Label(validationMessage, systemImage: "exclamationmark.triangle.fill")
-                        .font(.callout)
+                        .appFont(.callout)
                         .foregroundStyle(.orange)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(12)
@@ -55,9 +55,9 @@ struct LocalConnectorModelsView: View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
                 Text("统一模型配置")
-                    .font(.title3.weight(.semibold))
+                    .appFont(.title3.weight(.semibold))
                 Text("供应商与云端默认模型保存在 ChatOS；本机审批模型只保存在这台 Mac。")
-                    .font(.caption)
+                    .appFont(.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer()
@@ -84,9 +84,9 @@ struct LocalConnectorModelsView: View {
         ) {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("模型请求最大重试次数").font(.headline)
+                    Text("模型请求最大重试次数").appFont(.headline)
                     Text("允许范围 0–10，默认 5。")
-                        .font(.caption)
+                        .appFont(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()

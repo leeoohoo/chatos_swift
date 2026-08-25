@@ -36,7 +36,7 @@ struct ProjectFileEditorView: View {
             HStack(spacing: 8) {
                 if let symbol = viewModel.selectedSymbol {
                     Label(symbol.token, systemImage: "scope")
-                        .font(.caption.monospaced().weight(.semibold))
+                        .appFont(.caption.monospaced().weight(.semibold))
                         .padding(.horizontal, 9)
                         .padding(.vertical, 5)
                         .background(Color.accentColor.opacity(0.1), in: Capsule())
@@ -65,7 +65,7 @@ struct ProjectFileEditorView: View {
                 if let result = viewModel.navigationResult,
                    let kind = viewModel.navigationRequestKind {
                     Text("\(kind.rawValue) · \(result.locations.count) 处 · \(localizedMode(result.mode))")
-                        .font(.caption)
+                        .appFont(.caption)
                         .foregroundStyle(.secondary)
                 }
 
@@ -81,7 +81,7 @@ struct ProjectFileEditorView: View {
 
             if let error = viewModel.navigationError {
                 Text(error)
-                    .font(.caption)
+                    .appFont(.caption)
                     .foregroundStyle(.secondary)
             }
 
@@ -98,9 +98,9 @@ struct ProjectFileEditorView: View {
                                         .padding(.top, 1)
                                     VStack(alignment: .leading, spacing: 3) {
                                         Text("\(location.relativePath) · 第 \(location.line) 行")
-                                            .font(.caption.weight(.semibold))
+                                            .appFont(.caption.weight(.semibold))
                                         Text(location.preview.trimmingCharacters(in: .whitespaces))
-                                            .font(.caption.monospaced())
+                                            .appFont(.caption.monospaced())
                                             .foregroundStyle(.secondary)
                                             .lineLimit(2)
                                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -122,7 +122,7 @@ struct ProjectFileEditorView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(AppPalette.surfaceSubtle)
     }
 
     private func localizedMode(_ mode: String) -> String {
@@ -136,8 +136,8 @@ struct ProjectFileEditorView: View {
     private func header(_ file: ProjectFileContent) -> some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(file.name).font(.headline)
-                Text(file.path).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1)
+                Text(file.name).appFont(.headline)
+                Text(file.path).appFont(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer()
             if viewModel.isEditing {

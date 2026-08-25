@@ -32,7 +32,7 @@ struct MessageTaskInspectorView: View {
         }
         .frame(minWidth: 320, idealWidth: 360, maxWidth: 420)
         .frame(maxHeight: .infinity)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(AppPalette.canvas)
         .onChange(of: viewModel.inspectorSection) {
             viewModel.ensureInspectorSectionLoaded()
         }
@@ -41,7 +41,7 @@ struct MessageTaskInspectorView: View {
     private var inspectorHeader: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("任务检查器").font(.headline)
+                Text("任务检查器").appFont(.headline)
                 Spacer()
                 if viewModel.isLoadingInspector { ProgressView().controlSize(.small) }
             }
@@ -94,7 +94,7 @@ struct MessageTaskInspectorView: View {
                 TaskDetailTextCard(title: "运行结果摘要", text: summary)
             }
             VStack(alignment: .leading, spacing: 10) {
-                Text("运行信息").font(.subheadline.weight(.semibold))
+                Text("运行信息").appFont(.subheadline.weight(.semibold))
                 LabeledContent("状态", value: detail.run.status ?? "未知")
                 LabeledContent("运行 ID", value: detail.run.id)
                 if let startedAt = detail.run.startedAt {
@@ -143,13 +143,13 @@ struct MessageTaskInspectorView: View {
     private func blockedActions(_ task: MessageTask) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Label("处理阻塞", systemImage: "exclamationmark.triangle")
-                .font(.subheadline.weight(.semibold))
+                .appFont(.subheadline.weight(.semibold))
                 .foregroundStyle(.orange)
             Text("补充本次重试需要遵循的说明；提交后会调用原 Rust 后端的 Task Runner 重试接口。")
-                .font(.caption)
+                .appFont(.caption)
                 .foregroundStyle(.secondary)
             TextEditor(text: $viewModel.retryInstruction)
-                .font(.body)
+                .appFont(.body)
                 .frame(minHeight: 72)
                 .overlay { RoundedRectangle(cornerRadius: 7).stroke(.separator) }
             Button("重新运行", systemImage: "arrow.clockwise") {
@@ -164,9 +164,9 @@ struct MessageTaskInspectorView: View {
 
     private func textSection(_ title: String, _ text: String) -> some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(title).font(.subheadline.weight(.semibold))
+            Text(title).appFont(.subheadline.weight(.semibold))
             Text(text)
-                .font(.callout)
+                .appFont(.callout)
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
         }

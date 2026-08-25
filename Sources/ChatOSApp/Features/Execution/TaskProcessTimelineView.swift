@@ -15,9 +15,9 @@ struct TaskProcessTimelineView: View {
             LazyVStack(alignment: .leading, spacing: 0) {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("执行时间线").font(.subheadline.weight(.semibold))
+                        Text("执行时间线").appFont(.subheadline.weight(.semibold))
                         Text("任务执行期间记录的关键节点")
-                            .font(.caption)
+                            .appFont(.caption)
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
@@ -36,7 +36,7 @@ struct TaskProcessTimelineView: View {
         HStack(alignment: .top, spacing: 12) {
             VStack(spacing: 0) {
                 Image(systemName: statusIcon(item.status))
-                    .font(.caption2.weight(.semibold))
+                    .appFont(.caption2.weight(.semibold))
                     .foregroundStyle(statusColor(item.status))
                     .frame(width: 18, height: 18)
                     .background(statusColor(item.status).opacity(0.12), in: Circle())
@@ -48,20 +48,20 @@ struct TaskProcessTimelineView: View {
             }
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(item.title).font(.callout.weight(.semibold))
+                    Text(item.title).appFont(.callout.weight(.semibold))
                     Spacer()
                     if let occurredAt = item.occurredAt {
                         Text(occurredAt)
-                            .font(.caption2.monospaced())
+                            .appFont(.caption2.monospaced())
                             .foregroundStyle(.tertiary)
                     }
                 }
                 Text(item.detail)
-                    .font(.callout)
+                    .appFont(.callout)
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
                 Text(statusTitle(item.status))
-                    .font(.caption2.weight(.medium))
+                    .appFont(.caption2.weight(.medium))
                     .foregroundStyle(statusColor(item.status))
             }
             .padding(.bottom, isLast ? 0 : 14)

@@ -14,6 +14,7 @@ struct ProjectDirectoryView: View {
         codeNavigationService: any ProjectCodeNavigationServicing
     ) {
         _viewModel = StateObject(wrappedValue: ProjectDirectoryViewModel(
+            projectID: projectID,
             rootPath: rootPath,
             service: service,
             codeNavigationService: codeNavigationService
@@ -64,7 +65,7 @@ struct ProjectDirectoryView: View {
             }
         }
         .workspaceFill()
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(AppPalette.canvas)
     }
 
     private var tree: some View {
@@ -95,18 +96,18 @@ struct ProjectDirectoryView: View {
                                     Image(systemName: "text.magnifyingglass")
                                         .foregroundStyle(.secondary)
                                     Text(URL(fileURLWithPath: match.path).lastPathComponent)
-                                        .font(.subheadline.weight(.semibold))
+                                        .appFont(.subheadline.weight(.semibold))
                                     Spacer()
                                     Text("第 \(match.line) 行")
-                                        .font(.caption2.monospacedDigit())
+                                        .appFont(.caption2.monospacedDigit())
                                         .foregroundStyle(AppPalette.ai)
                                 }
                                 Text(match.text.trimmingCharacters(in: .whitespaces))
-                                    .font(.caption.monospaced())
+                                    .appFont(.caption.monospaced())
                                     .foregroundStyle(.secondary)
                                     .lineLimit(2)
                                 Text(match.displayPath ?? match.path)
-                                    .font(.caption2.monospaced())
+                                    .appFont(.caption2.monospaced())
                                     .foregroundStyle(.tertiary)
                                     .lineLimit(1)
                             }
@@ -124,7 +125,7 @@ struct ProjectDirectoryView: View {
                             VStack(alignment: .leading, spacing: 3) {
                                 Label(entry.name, systemImage: entry.isDirectory ? "folder" : "doc.text")
                                 Text(entry.displayPath ?? entry.path)
-                                    .font(.caption2.monospaced())
+                                    .appFont(.caption2.monospaced())
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
                             }
@@ -136,11 +137,14 @@ struct ProjectDirectoryView: View {
         }
         .workspaceFill()
         .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
+        .background(AppPalette.canvas)
         .overlay {
             if viewModel.isSearching {
                 ProgressView("正在搜索文件内容…")
                     .padding(16)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+                    .background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 10))
+                    .overlay { RoundedRectangle(cornerRadius: 10).stroke(AppPalette.border.opacity(0.8)) }
             } else if viewModel.searchResults.isEmpty && viewModel.contentSearchResults.isEmpty {
                 ContentUnavailableView.search(text: viewModel.searchText)
             }
@@ -149,7 +153,7 @@ struct ProjectDirectoryView: View {
 
     private func createSheet(_ kind: CreateKind) -> some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text(kind == .file ? "新建文件" : "新建文件夹").font(.title2.weight(.semibold))
+            Text(kind == .file ? "新建文件" : "新建文件夹").appFont(.title2.weight(.semibold))
             TextField(kind == .file ? "例如 README.md" : "文件夹名称", text: $createName)
                 .textFieldStyle(.roundedBorder)
             HStack {
@@ -185,7 +189,9 @@ private struct ProjectFileTreeRow: View {
         Button(action: action) {
             HStack(spacing: 7) {
                 if item.entry.isDirectory {
-                    Image(systemName: "chevron.right").font(.caption2.weight(.bold)).foregroundStyle(.secondary)
+                    Image(systemName: item.isExpanded ? "chevron.down" : "chevron.right")
+                        .appFont(.caption2.weight(.bold))
+                        .foregroundStyle(.secondary)
                 } else {
                     Color.clear.frame(width: 10, height: 10)
                 }

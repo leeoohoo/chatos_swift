@@ -8,7 +8,8 @@ struct ChatOSApp: App {
         WindowGroup("ChatOS") {
             RootView()
                 .environmentObject(model)
-                .dynamicTypeSize(model.interfaceDynamicTypeSize)
+                .environment(\.interfaceFontScale, model.interfaceFontScale)
+                .font(.system(size: model.interfaceFontSize))
                 .frame(minWidth: 1_100, minHeight: 720)
         }
         .defaultSize(width: 1_440, height: 900)
@@ -17,7 +18,8 @@ struct ChatOSApp: App {
         Settings {
             SettingsView()
                 .environmentObject(model)
-                .dynamicTypeSize(model.interfaceDynamicTypeSize)
+                .environment(\.interfaceFontScale, model.interfaceFontScale)
+                .font(.system(size: model.interfaceFontSize))
                 .frame(minWidth: 1_050, minHeight: 700)
         }
     }

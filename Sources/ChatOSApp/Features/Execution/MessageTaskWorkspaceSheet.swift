@@ -39,9 +39,9 @@ struct MessageTaskWorkspaceSheet: View {
     private var header: some View {
         HStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("任务流程图").font(.title3.weight(.semibold))
+                Text("任务流程图").appFont(.title3.weight(.semibold))
                 Text(viewModel.turn.userMessage.text)
-                    .font(.caption)
+                    .appFont(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }

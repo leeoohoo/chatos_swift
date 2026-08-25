@@ -61,7 +61,7 @@ struct TerminalWorkspaceView: View {
                     )
                     .id("prompt")
                 }
-                .font(.system(size: 13, design: .monospaced))
+                .appFont(.system(size: 13, design: .monospaced))
                 .textSelection(.enabled)
                 .padding(22)
                 .frame(maxWidth: .infinity, alignment: .leading)
