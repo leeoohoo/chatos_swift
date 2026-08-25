@@ -2,6 +2,7 @@ public struct ConversationSendCommand: Sendable, Equatable {
     public var sessionID: String
     public var turnID: String
     public var content: String
+    public var attachments: [ConversationAttachmentDraft]
     public var reasoningEnabled: Bool?
     public var planModeEnabled: Bool?
 
@@ -9,12 +10,14 @@ public struct ConversationSendCommand: Sendable, Equatable {
         sessionID: String,
         turnID: String,
         content: String,
+        attachments: [ConversationAttachmentDraft] = [],
         reasoningEnabled: Bool? = nil,
         planModeEnabled: Bool? = nil
     ) {
         self.sessionID = sessionID
         self.turnID = turnID
         self.content = content
+        self.attachments = attachments
         self.reasoningEnabled = reasoningEnabled
         self.planModeEnabled = planModeEnabled
     }

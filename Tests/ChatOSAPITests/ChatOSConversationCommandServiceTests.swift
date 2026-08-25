@@ -82,6 +82,85 @@ final class ChatOSConversationCommandServiceTests: XCTestCase {
         let request = try XCTUnwrap(capturedGuidanceRequest)
         XCTAssertEqual(request.url.path, "/api/chatos/agent/chat/guidance")
     }
+
+    func testUploadedAttachmentsAreIncludedInChatCommand() async throws {
+        let transport = CommandTransport()
+        let uploader = CommandAttachmentUploader()
+        let client = ChatOSAPIClient(
+            configuration: .init(baseURL: URL(string: "https://example.com/api/chatos")!),
+            accessToken: "token",
+            transport: transport
+        )
+        let service = ChatOSConversationCommandService(
+            client: client,
+            attachmentService: uploader
+        )
+        let draft = ConversationAttachmentDraft(
+            id: "draft-1",
+            name: "design.pdf",
+            mimeType: "application/pdf",
+            kind: .file,
+            origin: .file,
+            data: Data("pdf".utf8)
+        )
+
+        _ = try await service.sendNewTurn(
+            ConversationSendCommand(
+                sessionID: "conversation-1",
+                turnID: "turn-attachment",
+                content: "请查看附件",
+                attachments: [draft]
+            )
+        )
+
+        let capturedUpload = await uploader.recordedUpload()
+        XCTAssertEqual(capturedUpload?.conversationID, "conversation-1")
+        XCTAssertEqual(capturedUpload?.attachments, [draft])
+
+        let capturedRequest = await transport.commandRequest()
+        let request = try XCTUnwrap(capturedRequest)
+        let body = try XCTUnwrap(request.body)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let attachments = try XCTUnwrap(payload["attachments"] as? [[String: Any]])
+        XCTAssertEqual(attachments.count, 1)
+        XCTAssertEqual(attachments[0]["id"] as? String, "attachment-1")
+        XCTAssertEqual(attachments[0]["name"] as? String, "design.pdf")
+        XCTAssertEqual(attachments[0]["mimeType"] as? String, "application/pdf")
+        XCTAssertEqual(attachments[0]["type"] as? String, "file")
+        XCTAssertEqual(attachments[0]["objectKey"] as? String, "conversation-1/design.pdf")
+        XCTAssertEqual(attachments[0]["viewUrl"] as? String, "/api/attachments/object?token=abc")
+    }
+}
+
+private actor CommandAttachmentUploader: ConversationAttachmentUploading {
+    struct RecordedUpload: Sendable {
+        var attachments: [ConversationAttachmentDraft]
+        var conversationID: String
+    }
+
+    private var upload: RecordedUpload?
+
+    func upload(
+        _ attachments: [ConversationAttachmentDraft],
+        conversationID: String
+    ) async throws -> [ConversationAttachmentReference] {
+        upload = RecordedUpload(attachments: attachments, conversationID: conversationID)
+        return [
+            ConversationAttachmentReference(
+                id: "attachment-1",
+                name: "design.pdf",
+                mimeType: "application/pdf",
+                size: 3,
+                kind: .file,
+                storageProvider: "minio",
+                bucket: "attachments",
+                objectKey: "conversation-1/design.pdf",
+                viewURL: "/api/attachments/object?token=abc"
+            ),
+        ]
+    }
+
+    func recordedUpload() -> RecordedUpload? { upload }
 }
 
 private actor CommandTransport: HTTPTransport {

@@ -44,7 +44,7 @@ struct ModelConfigDTO: Decodable, Sendable {
 struct ChatCommandRequestDTO: Encodable {
     var conversationID: String
     var content: String
-    var attachments: [String] = []
+    var attachments: [ConversationAttachmentReference]
     var reasoningEnabled: Bool
     var planMode: Bool
     var turnID: String
@@ -82,7 +82,7 @@ struct GuidanceRequestDTO: Encodable {
     var conversationID: String
     var turnID: String
     var content: String
-    var attachments: [String] = []
+    var attachments: [ConversationAttachmentReference]
 
     enum CodingKeys: String, CodingKey {
         case content, attachments

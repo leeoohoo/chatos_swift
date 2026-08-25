@@ -19,8 +19,13 @@ struct UserTurnMessageView: View {
                         .appFont(.caption2)
                         .foregroundStyle(.tertiary)
                 }
-                Text(turn.userMessage.text)
-                    .textSelection(.enabled)
+                if !turn.userMessage.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text(turn.userMessage.text)
+                        .textSelection(.enabled)
+                }
+                if !turn.userMessage.attachments.isEmpty {
+                    MessageAttachmentChips(attachments: turn.userMessage.attachments)
+                }
                 if showsProcess || showsTaskGraph {
                     HStack(spacing: 8) {
                         if showsProcess {

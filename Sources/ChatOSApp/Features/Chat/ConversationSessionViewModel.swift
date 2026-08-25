@@ -21,6 +21,8 @@ final class ConversationSessionViewModel: ObservableObject {
     @Published var historyError: String?
     @Published var selectedTurnID: String?
     @Published var draft = ""
+    @Published var attachments: [ConversationAttachmentDraft] = []
+    @Published var attachmentError: String?
 
     let historyStore: any ConversationHistoryStoring
     let commandService: (any ConversationCommandServicing)?

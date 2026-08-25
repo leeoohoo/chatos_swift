@@ -3,9 +3,14 @@ import Foundation
 
 public actor ChatOSConversationCommandService: ConversationCommandServicing {
     private let client: ChatOSAPIClient
+    private let attachmentService: any ConversationAttachmentUploading
 
-    public init(client: ChatOSAPIClient) {
+    public init(
+        client: ChatOSAPIClient,
+        attachmentService: (any ConversationAttachmentUploading)? = nil
+    ) {
         self.client = client
+        self.attachmentService = attachmentService ?? ChatOSAttachmentService(client: client)
     }
 
     public func sendNewTurn(
@@ -18,9 +23,14 @@ public actor ChatOSConversationCommandService: ConversationCommandServicing {
 
         let (runtime, configs) = try await (settings, modelConfigs)
         let model = try resolveModel(runtime: runtime, configs: configs)
+        let attachments = try await attachmentService.upload(
+            command.attachments,
+            conversationID: command.sessionID
+        )
         let request = ChatCommandRequestDTO(
             conversationID: command.sessionID,
             content: command.content,
+            attachments: attachments,
             reasoningEnabled: command.reasoningEnabled ?? runtime.reasoningEnabled,
             planMode: command.planModeEnabled ?? runtime.planModeEnabled,
             turnID: command.turnID,
@@ -48,10 +58,15 @@ public actor ChatOSConversationCommandService: ConversationCommandServicing {
     public func sendGuidance(
         _ command: ConversationSendCommand
     ) async throws -> ConversationCommandAck {
+        let attachments = try await attachmentService.upload(
+            command.attachments,
+            conversationID: command.sessionID
+        )
         let request = GuidanceRequestDTO(
             conversationID: command.sessionID,
             turnID: command.turnID,
-            content: command.content
+            content: command.content,
+            attachments: attachments
         )
         let response: ChatCommandResponseDTO = try await client.request(
             "/agent/chat/guidance",

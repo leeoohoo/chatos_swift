@@ -4,33 +4,45 @@ import Foundation
 extension ConversationSessionViewModel {
     func sendDraft() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, !isSending else { return }
+        let outgoingAttachments = attachments
+        guard (!text.isEmpty || !outgoingAttachments.isEmpty), !isSending else { return }
         guard let commandService else {
             historyError = "聊天发送服务尚未连接。"
             return
         }
 
         if let activeTurn = turns.last(where: { $0.status == .streaming }) {
-            sendGuidance(text, turnID: activeTurn.id, using: commandService)
+            sendGuidance(
+                text,
+                attachments: outgoingAttachments,
+                turnID: activeTurn.id,
+                using: commandService
+            )
         } else {
-            sendNewTurn(text, using: commandService)
+            sendNewTurn(text, attachments: outgoingAttachments, using: commandService)
         }
     }
 
     private func sendGuidance(
         _ text: String,
+        attachments: [ConversationAttachmentDraft],
         turnID: String,
         using service: any ConversationCommandServicing
     ) {
-        beginSending(text)
+        beginSending()
         Task {
             do {
                 _ = try await service.sendGuidance(
-                    ConversationSendCommand(sessionID: sessionID, turnID: turnID, content: text)
+                    ConversationSendCommand(
+                        sessionID: sessionID,
+                        turnID: turnID,
+                        content: text,
+                        attachments: attachments
+                    )
                 )
                 refreshLatest()
             } catch {
-                restoreDraft(text, error: error)
+                restoreDraft(text, attachments: attachments, error: error)
             }
             isSending = false
         }
@@ -38,10 +50,11 @@ extension ConversationSessionViewModel {
 
     private func sendNewTurn(
         _ text: String,
+        attachments: [ConversationAttachmentDraft],
         using service: any ConversationCommandServicing
     ) {
-        let turn = makeOptimisticTurn(text)
-        beginSending(text)
+        let turn = makeOptimisticTurn(text, attachments: attachments)
+        beginSending()
         selectedTurnID = turn.id
 
         Task {
@@ -61,6 +74,7 @@ extension ConversationSessionViewModel {
                         sessionID: sessionID,
                         turnID: turn.id,
                         content: text,
+                        attachments: attachments,
                         reasoningEnabled: reasoningEnabled,
                         planModeEnabled: allowsPlanMode && planModeEnabled
                     )
@@ -69,24 +83,38 @@ extension ConversationSessionViewModel {
             } catch {
                 await historyStore.discardOptimisticTurn(sessionID: sessionID, turnID: turn.id)
                 await refreshSnapshot()
-                restoreDraft(text, error: error)
+                restoreDraft(text, attachments: attachments, error: error)
             }
             isSending = false
         }
     }
 
-    private func beginSending(_ text: String) {
+    private func beginSending() {
         draft = ""
+        attachments = []
+        attachmentError = nil
         historyError = nil
         isSending = true
     }
 
-    private func restoreDraft(_ text: String, error: Error) {
+    private func restoreDraft(
+        _ text: String,
+        attachments: [ConversationAttachmentDraft],
+        error: Error
+    ) {
         if draft.isEmpty { draft = text }
+        let currentIDs = Set(self.attachments.map(\.id))
+        self.attachments.insert(
+            contentsOf: attachments.filter { !currentIDs.contains($0.id) },
+            at: 0
+        )
         historyError = error.localizedDescription
     }
 
-    private func makeOptimisticTurn(_ text: String) -> ConversationTurn {
+    private func makeOptimisticTurn(
+        _ text: String,
+        attachments: [ConversationAttachmentDraft]
+    ) -> ConversationTurn {
         let now = Date()
         return ConversationTurn(
             id: "turn_\(UUID().uuidString.lowercased())",
@@ -97,7 +125,8 @@ extension ConversationSessionViewModel {
                 id: "optimistic_\(UUID().uuidString.lowercased())",
                 role: .user,
                 text: text,
-                createdAt: now
+                createdAt: now,
+                attachments: attachments.map(\.reference)
             ),
             status: .streaming,
             startedAt: now

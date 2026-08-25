@@ -19,12 +19,20 @@ public struct ChatMessage: Identifiable, Codable, Sendable, Equatable {
     public let role: Role
     public var text: String
     public var createdAt: Date
+    public var attachments: [ConversationAttachmentReference]
 
-    public init(id: String, role: Role, text: String, createdAt: Date) {
+    public init(
+        id: String,
+        role: Role,
+        text: String,
+        createdAt: Date,
+        attachments: [ConversationAttachmentReference] = []
+    ) {
         self.id = id
         self.role = role
         self.text = text
         self.createdAt = createdAt
+        self.attachments = attachments
     }
 }
 

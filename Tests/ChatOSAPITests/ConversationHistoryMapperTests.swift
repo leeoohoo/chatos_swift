@@ -115,6 +115,26 @@ final class ConversationHistoryMapperTests: XCTestCase {
         XCTAssertEqual(replies[2].taskCallback?.event, "task.completed")
     }
 
+    func testUserMessageMapsPersistedAttachments() throws {
+        let response = try JSONDecoder().decode(
+            CompactHistoryResponseDTO.self,
+            from: Data(#"{"items":[{"id":"user-with-file","role":"user","content":"请看附件","metadata":{"conversation_turn_id":"turn-file","attachments":[{"id":"attachment-1","name":"design.pdf","mimeType":"application/pdf","size":2048,"type":"file","storageProvider":"minio","bucket":"attachments","objectKey":"design.pdf","viewUrl":"/api/attachments/object?token=abc"}]}}],"has_more":false}"#.utf8)
+        )
+
+        let page = ConversationHistoryMapper.map(
+            response,
+            sessionID: "conversation-1",
+            requestGeneration: 1
+        )
+
+        let attachment = try XCTUnwrap(page.turns.first?.userMessage.attachments.first)
+        XCTAssertEqual(attachment.name, "design.pdf")
+        XCTAssertEqual(attachment.mimeType, "application/pdf")
+        XCTAssertEqual(attachment.size, 2048)
+        XCTAssertEqual(attachment.kind, .file)
+        XCTAssertEqual(attachment.objectKey, "design.pdf")
+    }
+
     private let fixtureJSON = #"""
     {
       "items": [
