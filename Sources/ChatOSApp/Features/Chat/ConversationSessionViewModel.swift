@@ -19,6 +19,7 @@ final class ConversationSessionViewModel: ObservableObject {
     @Published private(set) var reasoningEnabled = false
     @Published private(set) var taskGraphAvailability: [String: Bool] = [:]
     @Published var historyError: String?
+    @Published var sendError: String?
     @Published var selectedTurnID: String?
     @Published var draft = ""
     @Published var attachments: [ConversationAttachmentDraft] = []

@@ -7,7 +7,7 @@ extension ConversationSessionViewModel {
         let outgoingAttachments = attachments
         guard (!text.isEmpty || !outgoingAttachments.isEmpty), !isSending else { return }
         guard let commandService else {
-            historyError = "聊天发送服务尚未连接。"
+            sendError = "聊天发送服务尚未连接。"
             return
         }
 
@@ -93,7 +93,7 @@ extension ConversationSessionViewModel {
         draft = ""
         attachments = []
         attachmentError = nil
-        historyError = nil
+        sendError = nil
         isSending = true
     }
 
@@ -108,7 +108,7 @@ extension ConversationSessionViewModel {
             contentsOf: attachments.filter { !currentIDs.contains($0.id) },
             at: 0
         )
-        historyError = error.localizedDescription
+        sendError = error.localizedDescription
     }
 
     private func makeOptimisticTurn(
