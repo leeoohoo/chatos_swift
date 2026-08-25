@@ -1,3 +1,4 @@
+import ChatOSAPI
 import Foundation
 
 enum RuntimeConfiguration {
@@ -36,6 +37,10 @@ enum RuntimeConfiguration {
     static var contactConversationID: String {
         nonEmptyEnvironmentValue("CHATOS_CONTACT_CONVERSATION_ID")
             ?? "conversation-contact"
+    }
+
+    static func attachmentURL(for value: String?) -> URL? {
+        ChatOSAttachmentURLResolver.resolve(value, apiBaseURL: apiBaseURL)
     }
 
     private static func nonEmptyEnvironmentValue(_ key: String) -> String? {

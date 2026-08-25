@@ -72,34 +72,146 @@ struct ComposerAttachmentChip: View {
 
 struct MessageAttachmentChips: View {
     let attachments: [ConversationAttachmentReference]
+    @State private var previewedImage: ConversationAttachmentReference?
 
     var body: some View {
         AttachmentFlowLayout(spacing: 7) {
             ForEach(attachments) { attachment in
-                HStack(spacing: 7) {
-                    Image(systemName: attachmentIcon(
-                        kind: attachment.kind,
-                        mimeType: attachment.mimeType,
-                        origin: nil
-                    ))
-                    .foregroundStyle(AppPalette.ai)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(attachment.name)
-                            .lineLimit(1)
-                            .appFont(.caption.weight(.medium))
-                        Text(formatAttachmentSize(attachment.size))
-                            .appFont(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .padding(.horizontal, 9)
-                .padding(.vertical, 7)
-                .background(AppPalette.inputSurface, in: RoundedRectangle(cornerRadius: 8))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 8).stroke(AppPalette.border, lineWidth: 1)
+                if attachment.kind == .image,
+                   RuntimeConfiguration.attachmentURL(
+                    for: attachment.viewURL ?? attachment.url
+                   ) != nil {
+                    MessageInlineImage(
+                        attachment: attachment,
+                        onPreview: { previewedImage = attachment }
+                    )
+                } else {
+                    MessageFileAttachmentChip(attachment: attachment)
                 }
             }
         }
+        .sheet(item: $previewedImage) { attachment in
+            MessageRemoteImagePreview(attachment: attachment)
+        }
+    }
+}
+
+private struct MessageInlineImage: View {
+    let attachment: ConversationAttachmentReference
+    let onPreview: () -> Void
+
+    var body: some View {
+        Button(action: onPreview) {
+            AsyncImage(url: RuntimeConfiguration.attachmentURL(
+                for: attachment.viewURL ?? attachment.url
+            )) { phase in
+                switch phase {
+                case let .success(image):
+                    image
+                        .resizable()
+                        .scaledToFit()
+                case .failure:
+                    imagePlaceholder(systemImage: "exclamationmark.triangle")
+                case .empty:
+                    ZStack {
+                        imagePlaceholder(systemImage: "photo")
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                @unknown default:
+                    imagePlaceholder(systemImage: "photo")
+                }
+            }
+            .frame(width: 360, height: 220)
+            .background(AppPalette.inputSurface)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay {
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(AppPalette.border, lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .help("点击查看大图：\(attachment.name)")
+    }
+
+    private func imagePlaceholder(systemImage: String) -> some View {
+        Image(systemName: systemImage)
+            .font(.system(size: 24))
+            .foregroundStyle(.secondary)
+            .frame(width: 220, height: 140)
+    }
+}
+
+private struct MessageFileAttachmentChip: View {
+    let attachment: ConversationAttachmentReference
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Image(systemName: attachmentIcon(
+                kind: attachment.kind,
+                mimeType: attachment.mimeType,
+                origin: nil
+            ))
+            .foregroundStyle(AppPalette.ai)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(attachment.name)
+                    .lineLimit(1)
+                    .appFont(.caption.weight(.medium))
+                Text(formatAttachmentSize(attachment.size))
+                    .appFont(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 7)
+        .background(AppPalette.inputSurface, in: RoundedRectangle(cornerRadius: 8))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8).stroke(AppPalette.border, lineWidth: 1)
+        }
+    }
+}
+
+private struct MessageRemoteImagePreview: View {
+    let attachment: ConversationAttachmentReference
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(attachment.name)
+                    .appFont(.headline)
+                Spacer()
+                Button("关闭", action: dismiss.callAsFunction)
+                    .keyboardShortcut(.cancelAction)
+            }
+            .padding(16)
+            Divider()
+            AsyncImage(url: RuntimeConfiguration.attachmentURL(
+                for: attachment.viewURL ?? attachment.url
+            )) { phase in
+                switch phase {
+                case let .success(image):
+                    ScrollView([.horizontal, .vertical]) {
+                        image
+                            .resizable()
+                            .scaledToFit()
+                            .padding(20)
+                    }
+                case let .failure(error):
+                    ContentUnavailableView(
+                        "图片加载失败",
+                        systemImage: "exclamationmark.triangle",
+                        description: Text(error.localizedDescription)
+                    )
+                case .empty:
+                    ProgressView("正在加载图片…")
+                @unknown default:
+                    EmptyView()
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .frame(minWidth: 760, idealWidth: 920, minHeight: 560, idealHeight: 720)
     }
 }
 

@@ -41,6 +41,9 @@ extension ConversationSessionViewModel {
                     )
                 )
                 refreshLatest()
+            } catch ConversationCommandError.guidanceTargetInactive {
+                sendNewTurn(text, attachments: attachments, using: service)
+                return
             } catch {
                 restoreDraft(text, attachments: attachments, error: error)
             }

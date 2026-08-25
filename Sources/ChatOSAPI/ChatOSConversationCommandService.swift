@@ -68,11 +68,16 @@ public actor ChatOSConversationCommandService: ConversationCommandServicing {
             content: command.content,
             attachments: attachments
         )
-        let response: ChatCommandResponseDTO = try await client.request(
-            "/agent/chat/guidance",
-            method: "POST",
-            body: try JSONEncoder().encode(request)
-        )
+        let response: ChatCommandResponseDTO
+        do {
+            response = try await client.request(
+                "/agent/chat/guidance",
+                method: "POST",
+                body: try JSONEncoder().encode(request)
+            )
+        } catch let error as ChatOSAPIError where error.isInactiveGuidanceConflict {
+            throw ConversationCommandError.guidanceTargetInactive
+        }
         guard response.accepted != false else {
             throw ChatOSAPIError.server(statusCode: 409, message: "追加指令未被接受")
         }
@@ -94,5 +99,28 @@ public actor ChatOSConversationCommandService: ConversationCommandServicing {
             throw ChatOSAPIError.missingModelConfiguration
         }
         return fallback
+    }
+}
+
+private extension ChatOSAPIError {
+    var isInactiveGuidanceConflict: Bool {
+        let statusCode: Int
+        let message: String
+        switch self {
+        case let .server(code, value):
+            statusCode = code
+            message = value
+        case let .serverDetail(code, value, _, _):
+            statusCode = code
+            message = value
+        default:
+            return false
+        }
+        guard statusCode == 409 else { return false }
+        let normalized = message.lowercased()
+        return normalized.contains("目标轮次已结束")
+            || normalized.contains("无法追加指令")
+            || normalized.contains("turn has ended")
+            || normalized.contains("turn is no longer active")
     }
 }

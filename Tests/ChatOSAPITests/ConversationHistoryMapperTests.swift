@@ -135,6 +135,21 @@ final class ConversationHistoryMapperTests: XCTestCase {
         XCTAssertEqual(attachment.objectKey, "design.pdf")
     }
 
+    func testTerminalTaskMetadataDoesNotLeaveTurnStreaming() throws {
+        let response = try JSONDecoder().decode(
+            CompactHistoryResponseDTO.self,
+            from: Data(#"{"items":[{"id":"user-failed","role":"user","content":"你好","metadata":{"conversation_turn_id":"turn-failed","task_runner_async":{"overall_status":"failed","confirmation_status":"failed"}}}],"has_more":false}"#.utf8)
+        )
+
+        let page = ConversationHistoryMapper.map(
+            response,
+            sessionID: "conversation-1",
+            requestGeneration: 1
+        )
+
+        XCTAssertEqual(page.turns.first?.status, .failed)
+    }
+
     private let fixtureJSON = #"""
     {
       "items": [

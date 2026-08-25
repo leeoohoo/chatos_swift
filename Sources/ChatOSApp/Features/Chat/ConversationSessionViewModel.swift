@@ -37,6 +37,8 @@ final class ConversationSessionViewModel: ObservableObject {
     private var requestGeneration: Int64 = 0
     private var inFlightOlderCursor: String?
     private var realtimeTask: Task<Void, Never>?
+    private var historyRetryTask: Task<Void, Never>?
+    private var historyRetryAttempt = 0
     private var taskGraphAvailabilityTasks: [String: Task<Void, Never>] = [:]
     private var taskGraphAvailabilityRevisions: [String: Int64] = [:]
 
@@ -71,10 +73,18 @@ final class ConversationSessionViewModel: ObservableObject {
 
     deinit {
         realtimeTask?.cancel()
+        historyRetryTask?.cancel()
         taskGraphAvailabilityTasks.values.forEach { $0.cancel() }
     }
 
     func refreshLatest() {
+        historyRetryTask?.cancel()
+        historyRetryTask = nil
+        historyRetryAttempt = 0
+        refreshLatest(isAutomaticRetry: false)
+    }
+
+    private func refreshLatest(isAutomaticRetry: Bool) {
         guard let remoteService, !isRefreshing else { return }
         requestGeneration += 1
         let generation = requestGeneration
@@ -92,10 +102,32 @@ final class ConversationSessionViewModel: ObservableObject {
                 )
                 await historyStore.mergePage(page, sessionID: sessionID, origin: .latest)
                 await refreshSnapshot()
+                historyRetryAttempt = 0
+                historyRetryTask?.cancel()
+                historyRetryTask = nil
             } catch {
                 historyError = error.localizedDescription
+                scheduleHistoryRetry()
             }
             isRefreshing = false
+        }
+    }
+
+    private func scheduleHistoryRetry() {
+        let delays: [Duration] = [
+            .seconds(2),
+            .seconds(5),
+            .seconds(10),
+            .seconds(20),
+        ]
+        guard historyRetryTask == nil, historyRetryAttempt < delays.count else { return }
+        let delay = delays[historyRetryAttempt]
+        historyRetryAttempt += 1
+        historyRetryTask = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled, let self else { return }
+            self.historyRetryTask = nil
+            self.refreshLatest(isAutomaticRetry: true)
         }
     }
 

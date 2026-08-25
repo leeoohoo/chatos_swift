@@ -109,9 +109,19 @@ enum ConversationHistoryMapper {
         user: SessionMessageDTO,
         assistant: SessionMessageDTO?
     ) -> TurnStatus {
-        let status = (assistant?.status ?? user.status ?? "").lowercased()
+        let taskRunnerStatus = user.metadata.value(
+            at: "task_runner_async",
+            "overall_status"
+        )?.stringValue ?? user.metadata.value(
+            at: "task_runner_async",
+            "confirmation_status"
+        )?.stringValue
+        let status = (assistant?.status ?? user.status ?? taskRunnerStatus ?? "").lowercased()
         if status == "failed" || status == "error" { return .failed }
         if status == "cancelled" || status == "canceled" { return .cancelled }
+        if status == "completed" || status == "succeeded" || status == "success" {
+            return .completed
+        }
         return assistant == nil ? .streaming : .completed
     }
 }

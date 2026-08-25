@@ -1,3 +1,5 @@
+import Foundation
+
 public struct ConversationSendCommand: Sendable, Equatable {
     public var sessionID: String
     public var turnID: String
@@ -32,6 +34,19 @@ public struct ConversationCommandAck: Sendable, Equatable {
         self.accepted = accepted
         self.turnID = turnID
         self.userMessageID = userMessageID
+    }
+}
+
+public enum ConversationCommandError: Error, Sendable, Equatable {
+    case guidanceTargetInactive
+}
+
+extension ConversationCommandError: LocalizedError {
+    public var errorDescription: String? {
+        switch self {
+        case .guidanceTargetInactive:
+            "当前执行轮次已经结束，将作为一条新消息发送。"
+        }
     }
 }
 

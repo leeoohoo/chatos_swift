@@ -89,7 +89,10 @@ public actor ChatOSAPIClient {
             throw ChatOSAPIError.unauthorized
         }
         guard (200..<300).contains(response.statusCode) else {
-            let payload = APIErrorPayload.decode(response.body)
+            let payload = APIErrorPayload.decode(
+                response.body,
+                statusCode: response.statusCode
+            )
             if payload.code != nil || payload.challengePrompt != nil {
                 throw ChatOSAPIError.serverDetail(
                     statusCode: response.statusCode,
@@ -131,9 +134,41 @@ private struct APIErrorPayload: Decodable {
 
     var resolvedMessage: String { message ?? error ?? "Request failed" }
 
-    static func decode(_ data: Data) -> Self {
-        (try? JSONDecoder().decode(Self.self, from: data))
-            ?? .init(message: String(decoding: data, as: UTF8.self))
+    static func decode(_ data: Data, statusCode: Int) -> Self {
+        if let payload = try? JSONDecoder().decode(Self.self, from: data) {
+            return payload
+        }
+
+        if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let nested = object["error"] as? [String: Any] {
+            return .init(
+                message: nested["message"] as? String,
+                error: nil,
+                code: nested["code"] as? String,
+                challengePrompt: nested["challenge_prompt"] as? String
+            )
+        }
+
+        let rawText = String(decoding: data, as: UTF8.self)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if rawText.localizedCaseInsensitiveContains("<html")
+            || rawText.localizedCaseInsensitiveContains("<!doctype") {
+            return .init(message: friendlyGatewayMessage(statusCode: statusCode))
+        }
+        return .init(message: rawText.isEmpty ? friendlyGatewayMessage(statusCode: statusCode) : rawText)
+    }
+
+    private static func friendlyGatewayMessage(statusCode: Int) -> String {
+        switch statusCode {
+        case 502:
+            "服务网关暂时无法连接后端，请稍后重试。"
+        case 503:
+            "服务正在启动或暂时不可用，请稍后重试。"
+        case 504:
+            "服务响应超时，请稍后重试。"
+        default:
+            "服务器请求失败，请稍后重试。"
+        }
     }
 }
 

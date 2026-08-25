@@ -130,6 +130,37 @@ final class ChatOSConversationCommandServiceTests: XCTestCase {
         XCTAssertEqual(attachments[0]["objectKey"] as? String, "conversation-1/design.pdf")
         XCTAssertEqual(attachments[0]["viewUrl"] as? String, "/api/attachments/object?token=abc")
     }
+
+    func testEndedGuidanceTurnMapsToDomainConflict() async throws {
+        let client = ChatOSAPIClient(
+            configuration: .init(baseURL: URL(string: "https://example.com/api/chatos")!),
+            accessToken: "token",
+            transport: InactiveGuidanceTransport()
+        )
+
+        do {
+            _ = try await ChatOSConversationCommandService(client: client).sendGuidance(
+                ConversationSendCommand(
+                    sessionID: "conversation-1",
+                    turnID: "turn-ended",
+                    content: "作为新消息发送"
+                )
+            )
+            XCTFail("Expected inactive turn conflict")
+        } catch let error as ConversationCommandError {
+            XCTAssertEqual(error, .guidanceTargetInactive)
+        }
+    }
+}
+
+private actor InactiveGuidanceTransport: HTTPTransport {
+    func send(_ request: HTTPRequest) async throws -> HTTPResponse {
+        HTTPResponse(
+            statusCode: 409,
+            headers: ["content-type": "application/json"],
+            body: Data(#"{"error":{"code":"turn_ended","message":"目标轮次已结束，无法追加指令"}}"#.utf8)
+        )
+    }
 }
 
 private actor CommandAttachmentUploader: ConversationAttachmentUploading {
