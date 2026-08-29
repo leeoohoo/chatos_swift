@@ -5,15 +5,11 @@ import SwiftUI
 final class TerminalViewModel: ObservableObject {
     @Published var command = ""
     @Published var searchText = ""
-    @Published var isRunning = false
-    @Published var lines: [TerminalOutputLine] = [
-        .init(text: "Last login: today on ChatOS local terminal", kind: .system),
-        .init(text: "swift --version", kind: .command),
-        .init(text: "Apple Swift version 6.3.3", kind: .output),
-        .init(text: "Ready.", kind: .success),
-    ]
+    @Published private(set) var isRunning = false
+    @Published private(set) var lines: [TerminalOutputLine] = []
+    @Published private(set) var focusRequestRevision = 0
 
-    let workingDirectory: String
+    @Published private(set) var workingDirectory: String
     private let executor: any TerminalCommandExecuting
 
     init(
@@ -51,6 +47,10 @@ final class TerminalViewModel: ObservableObject {
         lines.removeAll()
     }
 
+    func appendSystemLine(_ text: String) {
+        lines.append(.init(text: text, kind: .system))
+    }
+
     private func apply(_ result: TerminalCommandResult) {
         if !result.output.isEmpty {
             lines.append(.init(text: result.output, kind: result.exitCode == 0 ? .output : .error))
@@ -58,9 +58,11 @@ final class TerminalViewModel: ObservableObject {
         if !result.error.isEmpty {
             lines.append(.init(text: result.error, kind: .error))
         }
-        if result.exitCode == 0 {
-            lines.append(.init(text: "命令完成", kind: .success))
+        if let workingDirectory = result.workingDirectory,
+           !workingDirectory.isEmpty {
+            self.workingDirectory = workingDirectory
         }
         isRunning = false
+        focusRequestRevision += 1
     }
 }

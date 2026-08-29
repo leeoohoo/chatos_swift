@@ -3,15 +3,20 @@ import SwiftUI
 
 struct MarkdownDocumentView: View {
     private let blocks: [MarkdownBlock]
+    private let allowsTextSelection: Bool
 
-    init(markdown: String) {
+    init(markdown: String, allowsTextSelection: Bool = true) {
         blocks = MarkdownBlockParser.parse(markdown)
+        self.allowsTextSelection = allowsTextSelection
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 13) {
             ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
-                MarkdownBlockView(block: block)
+                MarkdownBlockView(
+                    block: block,
+                    allowsTextSelection: allowsTextSelection
+                )
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -20,17 +25,18 @@ struct MarkdownDocumentView: View {
 
 private struct MarkdownBlockView: View {
     let block: MarkdownBlock
+    let allowsTextSelection: Bool
 
     @ViewBuilder
     var body: some View {
         switch block {
         case let .heading(level, text):
-            MarkdownInlineText(text: text)
+            MarkdownInlineText(text: text, allowsTextSelection: allowsTextSelection)
                 .appFont(headingFont(level))
                 .padding(.top, level <= 2 ? 4 : 0)
 
         case let .paragraph(text):
-            MarkdownInlineText(text: text)
+            MarkdownInlineText(text: text, allowsTextSelection: allowsTextSelection)
                 .appFont(.callout)
                 .lineSpacing(4)
 
@@ -42,7 +48,10 @@ private struct MarkdownBlockView: View {
                             .appFont(.callout.monospacedDigit().weight(.semibold))
                             .foregroundStyle(AppPalette.ai)
                             .frame(minWidth: 15, alignment: .trailing)
-                        MarkdownInlineText(text: item.text)
+                        MarkdownInlineText(
+                            text: item.text,
+                            allowsTextSelection: allowsTextSelection
+                        )
                             .appFont(.callout)
                             .lineSpacing(3)
                     }
@@ -55,7 +64,7 @@ private struct MarkdownBlockView: View {
                 RoundedRectangle(cornerRadius: 1)
                     .fill(AppPalette.ai.opacity(0.55))
                     .frame(width: 3)
-                MarkdownInlineText(text: text)
+                MarkdownInlineText(text: text, allowsTextSelection: allowsTextSelection)
                     .appFont(.callout)
                     .foregroundStyle(.secondary)
                     .lineSpacing(3)
@@ -78,7 +87,7 @@ private struct MarkdownBlockView: View {
                     Text(content)
                         .appFont(.caption.monospaced())
                         .lineSpacing(3)
-                        .textSelection(.enabled)
+                        .appTextSelection(allowsTextSelection)
                         .fixedSize(horizontal: true, vertical: false)
                         .padding(11)
                 }
@@ -94,7 +103,11 @@ private struct MarkdownBlockView: View {
             Divider().padding(.vertical, 2)
 
         case let .table(headers, rows):
-            MarkdownTableView(headers: headers, rows: rows)
+            MarkdownTableView(
+                headers: headers,
+                rows: rows,
+                allowsTextSelection: allowsTextSelection
+            )
         }
     }
 
@@ -110,10 +123,11 @@ private struct MarkdownBlockView: View {
 
 private struct MarkdownInlineText: View {
     let text: String
+    let allowsTextSelection: Bool
 
     var body: some View {
         Text(rendered)
-            .textSelection(.enabled)
+            .appTextSelection(allowsTextSelection)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -128,6 +142,7 @@ private struct MarkdownInlineText: View {
 private struct MarkdownTableView: View {
     let headers: [String]
     let rows: [[String]]
+    let allowsTextSelection: Bool
 
     var body: some View {
         ScrollView(.horizontal) {
@@ -154,7 +169,7 @@ private struct MarkdownTableView: View {
     }
 
     private func tableCell(_ text: String, isHeader: Bool) -> some View {
-        MarkdownInlineText(text: text)
+        MarkdownInlineText(text: text, allowsTextSelection: allowsTextSelection)
             .appFont(.caption.weight(isHeader ? .semibold : .regular))
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
@@ -170,6 +185,17 @@ private struct MarkdownTableView: View {
                     .fill(Color(nsColor: .separatorColor))
                     .frame(height: 1)
             }
+    }
+}
+
+extension View {
+    @ViewBuilder
+    func appTextSelection(_ isEnabled: Bool) -> some View {
+        if isEnabled {
+            textSelection(.enabled)
+        } else {
+            self
+        }
     }
 }
 

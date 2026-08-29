@@ -2,14 +2,18 @@ import SwiftUI
 
 struct ProjectWorkspaceView: View {
     @EnvironmentObject private var model: AppModel
+    @State private var showingNotepad = false
     let projectID: String
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Picker("项目工作面", selection: $model.projectTab) {
+                Picker(
+                    model.localized("项目工作面", english: "Project Workspace"),
+                    selection: $model.projectTab
+                ) {
                     ForEach(ProjectWorkspaceTab.allCases) { tab in
-                        Text(tab.rawValue).tag(tab)
+                        Text(tab.title(language: model.interfaceLanguage)).tag(tab)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -29,7 +33,12 @@ struct ProjectWorkspaceView: View {
         .navigationTitle(
             model.projects.first(where: { $0.id == projectID })?.title ?? projectID
         )
-        .toolbar { ProjectToolbar() }
+        .toolbar { ProjectToolbar(showingNotepad: $showingNotepad) }
+        .sheet(isPresented: $showingNotepad) {
+            NotepadSheet(service: model.notepadService) {
+                showingNotepad = false
+            }
+        }
     }
 
     @ViewBuilder
@@ -42,7 +51,8 @@ struct ProjectWorkspaceView: View {
                     projectID: projectID,
                     rootPath: project?.rootPath,
                     service: model.projectFilesystemService,
-                    codeNavigationService: model.projectCodeNavigationService
+                    codeNavigationService: model.projectCodeNavigationService,
+                    gitService: model.projectGitService
                 )
                 .id(project?.rootPath ?? projectID)
             case .messages:
@@ -52,7 +62,8 @@ struct ProjectWorkspaceView: View {
                     projectID: projectID,
                     service: model.projectPlanService,
                     graphService: model.messageTaskGraphService,
-                    executionService: model.projectExecutionService
+                    executionService: model.projectExecutionService,
+                    realtimeService: model.realtimeService
                 )
             case .settings:
                 ProjectRunSettingsView(
@@ -69,26 +80,30 @@ struct ProjectWorkspaceView: View {
 
 private struct ProjectToolbar: ToolbarContent {
     @EnvironmentObject private var model: AppModel
+    @Binding var showingNotepad: Bool
 
     var body: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
-            Button {} label: {
+            Button { showingNotepad = true } label: {
                 Image(systemName: "note.text")
             }
-            .help("打开记事本")
+            .help(model.localized("打开记事本", english: "Open Notepad"))
 
             Menu {
                 SettingsLink {
-                    Label("设置", systemImage: "gear")
+                    Label(model.localized("设置", english: "Settings"), systemImage: "gear")
                 }
                 Divider()
-                Button("退出登录", systemImage: "rectangle.portrait.and.arrow.right") {
+                Button(
+                    model.localized("退出登录", english: "Sign Out"),
+                    systemImage: "rectangle.portrait.and.arrow.right"
+                ) {
                     model.authentication.logout()
                 }
             } label: {
                 Image(systemName: "person.crop.circle")
             }
-            .help("账号")
+            .help(model.localized("账号", english: "Account"))
         }
     }
 }

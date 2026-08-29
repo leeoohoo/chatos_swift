@@ -2,6 +2,7 @@ import ChatOSCore
 import SwiftUI
 
 struct MessageTaskGraphNodeCard: View {
+    @EnvironmentObject private var model: AppModel
     let node: MessageTaskGraphNode
     let renderScale: Double
     let isSelected: Bool
@@ -35,7 +36,9 @@ struct MessageTaskGraphNodeCard: View {
             Text(node.task.title)
                 .appFont(.system(size: scaledFont(13), weight: .semibold))
                 .lineLimit(2)
-            Text(node.task.description ?? node.task.objective ?? "暂无任务描述")
+            Text(node.task.description
+                 ?? node.task.objective
+                 ?? model.localized("暂无任务描述", english: "No task description"))
                 .appFont(.system(size: scaledFont(11)))
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
@@ -77,7 +80,7 @@ struct MessageTaskGraphNodeCard: View {
 
     private func actionButton(_ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .appFont(.system(size: scaledFont(10), weight: .medium))
                 .padding(.horizontal, scaled(7))
                 .padding(.vertical, scaled(3))
@@ -99,12 +102,12 @@ struct MessageTaskGraphNodeCard: View {
 
     private var statusTitle: String {
         switch node.task.normalizedStatus {
-        case "completed", "succeeded", "success", "done": "已完成"
-        case "running", "processing", "in_progress", "doing": "运行中"
-        case "blocked": "被阻塞"
-        case "failed", "error": "失败"
-        case "cancelled", "canceled": "已取消"
-        default: "等待执行"
+        case "completed", "succeeded", "success", "done": model.localized("已完成", english: "Completed")
+        case "running", "processing", "in_progress", "doing": model.localized("运行中", english: "Running")
+        case "blocked": model.localized("被阻塞", english: "Blocked")
+        case "failed", "error": model.localized("失败", english: "Failed")
+        case "cancelled", "canceled": model.localized("已取消", english: "Cancelled")
+        default: model.localized("等待执行", english: "Waiting")
         }
     }
 

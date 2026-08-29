@@ -32,7 +32,13 @@ public actor ConversationHistoryStore {
         origin: ConversationHistoryPageOrigin = .latest
     ) {
         var state = sessions[sessionID] ?? SessionState()
-        merge(page.turns, sessionID: sessionID, into: &state)
+        let didChange = merge(page.turns, sessionID: sessionID, into: &state)
+
+        if didChange,
+           origin == .latest,
+           state.viewportAnchor?.isPinnedToBottom == false {
+            state.unreadNewerCount += 1
+        }
 
         switch origin {
         case .latest:

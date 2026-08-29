@@ -15,6 +15,8 @@ final class ConversationSessionViewModel: ObservableObject {
     @Published private(set) var isLoadingOlder = false
     @Published var isSending = false
     @Published private(set) var isUpdatingRuntimeSettings = false
+    @Published private(set) var availableModels: [ConversationModelOption] = []
+    @Published private(set) var selectedModelID: String?
     @Published private(set) var planModeEnabled = false
     @Published private(set) var reasoningEnabled = false
     @Published private(set) var taskGraphAvailability: [String: Bool] = [:]
@@ -24,6 +26,10 @@ final class ConversationSessionViewModel: ObservableObject {
     @Published var draft = ""
     @Published var attachments: [ConversationAttachmentDraft] = []
     @Published var attachmentError: String?
+    @Published var askUserPrompts: [AskUserPrompt] = []
+    @Published var submittingAskUserPromptIDs: Set<String> = []
+    @Published var askUserPromptErrors: [String: String] = [:]
+    @Published private(set) var focusRequest: ConversationFocusRequest?
 
     let historyStore: any ConversationHistoryStoring
     let commandService: (any ConversationCommandServicing)?
@@ -31,14 +37,17 @@ final class ConversationSessionViewModel: ObservableObject {
     let messageTaskGraphService: (any MessageTaskGraphServicing)?
     let projectExecutionService: (any ProjectExecutionServicing)?
     private let remoteService: (any ConversationRemoteServicing)?
-    private let realtimeService: (any ConversationRealtimeStreaming)?
+    let realtimeService: (any ConversationRealtimeStreaming)?
     private let runtimeSettingsService: (any ConversationRuntimeSettingsServicing)?
+    let askUserPromptService: (any AskUserPromptServicing)?
     private var olderCursor: String?
     private var requestGeneration: Int64 = 0
     private var inFlightOlderCursor: String?
     private var realtimeTask: Task<Void, Never>?
     private var historyRetryTask: Task<Void, Never>?
     private var historyRetryAttempt = 0
+    private var latestRefreshPending = false
+    private var viewportUpdateGeneration: Int64 = 0
     private var taskGraphAvailabilityTasks: [String: Task<Void, Never>] = [:]
     private var taskGraphAvailabilityRevisions: [String: Int64] = [:]
 
@@ -53,7 +62,8 @@ final class ConversationSessionViewModel: ObservableObject {
         turnProcessService: (any TurnProcessServicing)? = nil,
         messageTaskGraphService: (any MessageTaskGraphServicing)? = nil,
         projectExecutionService: (any ProjectExecutionServicing)? = nil,
-        runtimeSettingsService: (any ConversationRuntimeSettingsServicing)? = nil
+        runtimeSettingsService: (any ConversationRuntimeSettingsServicing)? = nil,
+        askUserPromptService: (any AskUserPromptServicing)? = nil
     ) {
         self.sessionID = sessionID
         self.allowsPlanMode = allowsPlanMode
@@ -67,6 +77,7 @@ final class ConversationSessionViewModel: ObservableObject {
         self.messageTaskGraphService = messageTaskGraphService
         self.projectExecutionService = projectExecutionService
         self.runtimeSettingsService = runtimeSettingsService
+        self.askUserPromptService = askUserPromptService
 
         Task { await bootstrap(initialTurns: initialTurns) }
     }
@@ -85,7 +96,12 @@ final class ConversationSessionViewModel: ObservableObject {
     }
 
     private func refreshLatest(isAutomaticRetry: Bool) {
-        guard let remoteService, !isRefreshing else { return }
+        guard let remoteService else { return }
+        guard !isRefreshing else {
+            latestRefreshPending = true
+            return
+        }
+        latestRefreshPending = false
         requestGeneration += 1
         let generation = requestGeneration
         isRefreshing = true
@@ -110,6 +126,10 @@ final class ConversationSessionViewModel: ObservableObject {
                 scheduleHistoryRetry()
             }
             isRefreshing = false
+            if latestRefreshPending {
+                latestRefreshPending = false
+                refreshLatest(isAutomaticRetry: false)
+            }
         }
     }
 
@@ -173,6 +193,44 @@ final class ConversationSessionViewModel: ObservableObject {
         }
     }
 
+    func focus(
+        turnID: String?,
+        promptID: String?,
+        taskID: String?,
+        runID: String?
+    ) {
+        selectedTurnID = turnID
+        focusRequest = ConversationFocusRequest(
+            turnID: turnID,
+            promptID: promptID,
+            taskID: taskID,
+            runID: runID
+        )
+    }
+
+    func consumeFocusRequest(id: UUID) {
+        guard focusRequest?.id == id else { return }
+        focusRequest = nil
+    }
+
+    func setTimelinePinnedToBottom(_ isPinned: Bool) {
+        viewportUpdateGeneration += 1
+        let generation = viewportUpdateGeneration
+        let turnID = turns.last?.id ?? sessionID
+        Task {
+            await historyStore.setViewportAnchor(
+                ViewportAnchor(
+                    turnID: turnID,
+                    relativeOffset: 0,
+                    isPinnedToBottom: isPinned
+                ),
+                sessionID: sessionID
+            )
+            guard generation == viewportUpdateGeneration else { return }
+            await refreshSnapshot()
+        }
+    }
+
     func hasTaskGraph(for turn: ConversationTurn) -> Bool {
         taskGraphAvailability[turn.id] == true
     }
@@ -181,7 +239,10 @@ final class ConversationSessionViewModel: ObservableObject {
         let isCandidate = turn.isTaskGraphAvailable
             && (turn.messageTaskLookup != nil || turn.projectExecutionContext != nil)
         guard isCandidate, let messageTaskGraphService else {
-            taskGraphAvailability[turn.id] = false
+            guard taskGraphAvailabilityRevisions[turn.id] != turn.revision
+                    || taskGraphAvailability[turn.id] != nil
+                    || taskGraphAvailabilityTasks[turn.id] != nil else { return }
+            taskGraphAvailability.removeValue(forKey: turn.id)
             taskGraphAvailabilityRevisions[turn.id] = turn.revision
             taskGraphAvailabilityTasks[turn.id]?.cancel()
             taskGraphAvailabilityTasks[turn.id] = nil
@@ -190,7 +251,7 @@ final class ConversationSessionViewModel: ObservableObject {
         guard taskGraphAvailabilityRevisions[turn.id] != turn.revision else { return }
 
         taskGraphAvailabilityRevisions[turn.id] = turn.revision
-        taskGraphAvailability[turn.id] = false
+        taskGraphAvailability.removeValue(forKey: turn.id)
         taskGraphAvailabilityTasks[turn.id]?.cancel()
         taskGraphAvailabilityTasks[turn.id] = Task { [weak self] in
             do {
@@ -202,20 +263,26 @@ final class ConversationSessionViewModel: ObservableObject {
                       self?.taskGraphAvailabilityRevisions[turn.id] == turn.revision else {
                     return
                 }
-                self?.taskGraphAvailability[turn.id] = !graph.nodes.isEmpty
+                if graph.nodes.isEmpty {
+                    self?.taskGraphAvailability.removeValue(forKey: turn.id)
+                } else {
+                    self?.taskGraphAvailability[turn.id] = true
+                }
             } catch {
                 guard !Task.isCancelled,
                       self?.taskGraphAvailabilityRevisions[turn.id] == turn.revision else {
                     return
                 }
-                self?.taskGraphAvailability[turn.id] = false
+                self?.taskGraphAvailability.removeValue(forKey: turn.id)
             }
             self?.taskGraphAvailabilityTasks[turn.id] = nil
         }
     }
 
     private func bootstrap(initialTurns: [ConversationTurn]) async {
-        await loadRuntimeSettings()
+        async let runtimeSettings: Void = loadRuntimeSettings()
+        async let prompts: Void = refreshAskUserPrompts()
+        _ = await (runtimeSettings, prompts)
         await historyStore.mergeCachedTurns(initialTurns, sessionID: sessionID)
         await refreshSnapshot()
         refreshLatest()
@@ -236,6 +303,36 @@ final class ConversationSessionViewModel: ObservableObject {
                 applyRuntimeSettings(settings)
             } catch {
                 planModeEnabled = previous
+                historyError = error.localizedDescription
+            }
+            isUpdatingRuntimeSettings = false
+        }
+    }
+
+    var selectedModelDisplayName: String {
+        if let selectedModelID,
+           let selected = availableModels.first(where: { $0.id == selectedModelID }) {
+            return selected.displayName
+        }
+        return availableModels.first?.displayName ?? "选择模型"
+    }
+
+    func setSelectedModelID(_ modelID: String) {
+        guard let runtimeSettingsService,
+              availableModels.contains(where: { $0.id == modelID }),
+              selectedModelID != modelID else { return }
+        let previous = selectedModelID
+        selectedModelID = modelID
+        isUpdatingRuntimeSettings = true
+        Task {
+            do {
+                let settings = try await runtimeSettingsService.updateModel(
+                    sessionID: sessionID,
+                    modelID: modelID
+                )
+                applyRuntimeSettings(settings)
+            } catch {
+                selectedModelID = previous
                 historyError = error.localizedDescription
             }
             isUpdatingRuntimeSettings = false
@@ -265,15 +362,23 @@ final class ConversationSessionViewModel: ObservableObject {
     private func loadRuntimeSettings() async {
         guard let runtimeSettingsService else { return }
         do {
-            applyRuntimeSettings(
-                try await runtimeSettingsService.fetchSettings(sessionID: sessionID)
-            )
+            async let settings = runtimeSettingsService.fetchSettings(sessionID: sessionID)
+            async let models = runtimeSettingsService.fetchAvailableModels()
+            let (resolvedSettings, resolvedModels) = try await (settings, models)
+            availableModels = resolvedModels
+            applyRuntimeSettings(resolvedSettings)
         } catch {
             historyError = error.localizedDescription
         }
     }
 
     private func applyRuntimeSettings(_ settings: ConversationRuntimeSettings) {
+        if let requestedID = settings.selectedModelID,
+           availableModels.contains(where: { $0.id == requestedID }) {
+            selectedModelID = requestedID
+        } else {
+            selectedModelID = availableModels.first?.id
+        }
         planModeEnabled = allowsPlanMode && settings.planModeEnabled
         reasoningEnabled = settings.reasoningEnabled
     }
@@ -287,8 +392,17 @@ final class ConversationSessionViewModel: ObservableObject {
             do {
                 for try await signal in stream {
                     guard let self else { return }
+                    if signal.askUserPromptUpdate != nil {
+                        await self.refreshAskUserPrompts()
+                        continue
+                    }
                     switch signal.kind {
-                    case .persisted, .completed, .failed, .cancelled:
+                    case .failed:
+                        self.sendError = signal.processUpdate?.detail?.trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        ).nonEmptyValue ?? "AI 处理失败，请检查模型配置后重试。"
+                        self.refreshLatest()
+                    case .persisted, .completed, .cancelled:
                         self.refreshLatest()
                     case .started, .updated, .unknown:
                         break
@@ -304,8 +418,31 @@ final class ConversationSessionViewModel: ObservableObject {
     func refreshSnapshot() async {
         let snapshot = await historyStore.snapshot(sessionID: sessionID)
         turns = snapshot.turns
+        preloadTaskGraphAvailability(for: snapshot.turns)
         olderCursor = snapshot.olderCursor
         hasOlder = snapshot.hasOlder
         unreadNewerCount = snapshot.unreadNewerCount
+    }
+
+    private func preloadTaskGraphAvailability(for turns: [ConversationTurn]) {
+        let currentTurnIDs = Set(turns.map(\.id))
+        let staleTurnIDs = taskGraphAvailabilityTasks.keys.filter {
+            !currentTurnIDs.contains($0)
+        }
+        for turnID in staleTurnIDs {
+            taskGraphAvailabilityTasks[turnID]?.cancel()
+            taskGraphAvailabilityTasks[turnID] = nil
+            taskGraphAvailabilityRevisions[turnID] = nil
+            taskGraphAvailability[turnID] = nil
+        }
+        for turn in turns {
+            resolveTaskGraphAvailability(for: turn)
+        }
+    }
+}
+
+private extension String {
+    var nonEmptyValue: String? {
+        isEmpty ? nil : self
     }
 }

@@ -92,6 +92,9 @@ public struct ProjectExecutionActionResult: Sendable, Equatable {
 }
 
 public protocol ProjectExecutionServicing: Sendable {
+    func fetchExecution(
+        _ identity: ProjectExecutionIdentity
+    ) async throws -> ProjectRequirementExecutionLaunch?
     func confirmExecution(_ identity: ProjectExecutionIdentity) async throws -> ProjectExecutionActionResult
     func abandonPlan(_ identity: ProjectExecutionIdentity) async throws -> ProjectExecutionActionResult
 }

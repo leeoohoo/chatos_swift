@@ -79,6 +79,36 @@ final class ChatOSMessageTaskGraphServiceTests: XCTestCase {
         XCTAssertTrue(request.url.query?.contains("event_limit=1") == true)
     }
 
+    func testCancelTaskUsesScopedMessageEndpoint() async throws {
+        let transport = MessageTaskGraphTransport()
+        let client = ChatOSAPIClient(
+            configuration: .init(baseURL: URL(string: "https://example.com/api/chatos")!),
+            accessToken: "token",
+            transport: transport
+        )
+
+        try await ChatOSMessageTaskGraphService(client: client).cancelTask(
+            messageID: "message-1",
+            taskID: "task-2",
+            lookup: MessageTaskLookup(sessionID: "session-1", turnID: "turn-1"),
+            reason: "用户从宠物面板取消"
+        )
+
+        let capturedRequest = await transport.lastRequest()
+        let request = try XCTUnwrap(capturedRequest)
+        XCTAssertEqual(request.method, "POST")
+        XCTAssertEqual(
+            request.url.path,
+            "/api/chatos/messages/message-1/task-runner/tasks/task-2/cancel"
+        )
+        XCTAssertTrue(request.url.query?.contains("session_id=session-1") == true)
+        let body = try XCTUnwrap(request.body)
+        let payload = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: body) as? [String: String]
+        )
+        XCTAssertEqual(payload["reason"], "用户从宠物面板取消")
+    }
+
     func testCompleteTaskDetailMapsFieldsUsedByNativeInspector() throws {
         let body = #"""
         {
@@ -129,6 +159,13 @@ private actor MessageTaskGraphTransport: HTTPTransport {
 
     func send(_ request: HTTPRequest) async throws -> HTTPResponse {
         self.request = request
+        if request.url.path.hasSuffix("/cancel") {
+            return HTTPResponse(
+                statusCode: 200,
+                headers: [:],
+                body: Data(#"{"success":true}"#.utf8)
+            )
+        }
         if request.url.path.contains("/runs/") {
             let body = #"""
             {

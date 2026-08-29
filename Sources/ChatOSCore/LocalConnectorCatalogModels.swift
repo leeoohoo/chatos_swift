@@ -75,6 +75,7 @@ public struct LocalConnectorPlugin: Codable, Identifiable, Sendable, Equatable {
     public var updateAvailable: Bool
     public var installAvailable: Bool
     public var enabled: Bool
+    public var permissions: [LocalConnectorPluginPermission]
 
     public var id: String { pluginID }
 
@@ -88,7 +89,8 @@ public struct LocalConnectorPlugin: Codable, Identifiable, Sendable, Equatable {
         installed: Bool,
         updateAvailable: Bool,
         installAvailable: Bool,
-        enabled: Bool
+        enabled: Bool,
+        permissions: [LocalConnectorPluginPermission] = []
     ) {
         self.pluginID = pluginID
         self.displayName = displayName
@@ -100,5 +102,45 @@ public struct LocalConnectorPlugin: Codable, Identifiable, Sendable, Equatable {
         self.updateAvailable = updateAvailable
         self.installAvailable = installAvailable
         self.enabled = enabled
+        self.permissions = permissions
+    }
+}
+
+public struct LocalConnectorPluginPermission: Codable, Identifiable, Sendable, Equatable {
+    public var permissionID: String
+    public var label: String
+    public var summary: String
+    public var required: Bool
+    public var status: String
+    public var statusLabel: String
+    public var canRequest: Bool
+    public var requestLabel: String
+    public var settingsTarget: String?
+    public var note: String?
+
+    public var id: String { permissionID }
+
+    public init(
+        permissionID: String,
+        label: String,
+        summary: String,
+        required: Bool,
+        status: String,
+        statusLabel: String,
+        canRequest: Bool,
+        requestLabel: String,
+        settingsTarget: String? = nil,
+        note: String? = nil
+    ) {
+        self.permissionID = permissionID
+        self.label = label
+        self.summary = summary
+        self.required = required
+        self.status = status
+        self.statusLabel = statusLabel
+        self.canRequest = canRequest
+        self.requestLabel = requestLabel
+        self.settingsTarget = settingsTarget
+        self.note = note
     }
 }

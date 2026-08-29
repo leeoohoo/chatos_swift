@@ -18,12 +18,23 @@ struct RootView: View {
                 detail
                     .workspaceFill()
 
-                if let visualSession = model.visualSession,
-                   visualSession.ownerSessionID == model.currentConversationID {
-                    VisualSessionOverlay(session: visualSession)
-                        .padding(18)
-                        .zIndex(20)
-                }
+                GlobalApprovalOverlayHost(viewModel: model.localConnectorControl)
+                    .padding(18)
+                    .zIndex(30)
+
+                VisualSessionOverlayHost(
+                    store: model.visualSessionStore,
+                    currentConversationID: model.currentConversationID
+                )
+                .padding(18)
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: model.localConnectorControl.pendingApprovals.isEmpty
+                        ? .topTrailing
+                        : .bottomTrailing
+                )
+                .zIndex(20)
             }
             .workspaceFill()
         }
@@ -37,6 +48,7 @@ struct RootView: View {
             switch model.selection {
             case let .project(projectID):
                 ProjectWorkspaceView(projectID: projectID)
+                    .id(projectID)
             case let .contact(contactID):
                 ContactConversationView(contactID: contactID)
             case .localConnector:
@@ -47,9 +59,12 @@ struct RootView: View {
                 RemoteConnectionDetailView(connectionID: remoteID)
             case nil:
                 ContentUnavailableView(
-                    "选择一个资源开始",
+                    model.localized("选择一个资源开始", english: "Select a resource to begin"),
                     systemImage: "sidebar.left",
-                    description: Text("联系人用于持续对话，项目包含目录、用户消息、Plan 和运行设置。")
+                    description: Text(model.localized(
+                        "联系人用于持续对话，项目包含目录、用户消息、Plan 和运行设置。",
+                        english: "Contacts provide ongoing conversations. Projects include files, messages, plans, and runtime settings."
+                    ))
                 )
             }
         }

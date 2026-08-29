@@ -39,9 +39,8 @@ public actor ChatOSConversationCommandService: ConversationCommandServicing {
             modelConfigID: model.id,
             aiModelConfig: .init(
                 temperature: model.temperature ?? 0.7,
-                modelName: runtime.selectedModelName?.trimmedNonEmptyValue ?? model.modelName,
-                thinkingLevel: runtime.selectedThinkingLevel?.trimmedNonEmptyValue
-                    ?? model.thinkingLevel
+                modelName: model.modelName,
+                thinkingLevel: model.thinkingLevel?.trimmedNonEmptyValue
             )
         )
         let response: ChatCommandResponseDTO = try await client.request(
@@ -82,6 +81,25 @@ public actor ChatOSConversationCommandService: ConversationCommandServicing {
             throw ChatOSAPIError.server(statusCode: 409, message: "追加指令未被接受")
         }
         return response.ack(fallbackTurnID: command.turnID)
+    }
+
+    public func stopTurn(conversationID: String, turnID: String?) async throws {
+        let response: StopChatResponseDTO = try await client.request(
+            "/agent/chat/stop",
+            method: "POST",
+            body: try JSONEncoder().encode(
+                StopChatRequestDTO(
+                    conversationID: conversationID,
+                    turnID: turnID?.trimmedNonEmptyValue
+                )
+            )
+        )
+        guard response.success else {
+            throw ChatOSAPIError.server(
+                statusCode: 409,
+                message: response.message?.trimmedNonEmptyValue ?? "当前 AI 执行无法停止"
+            )
+        }
     }
 
     private func resolveModel(

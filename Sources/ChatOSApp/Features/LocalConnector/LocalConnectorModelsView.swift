@@ -2,6 +2,7 @@ import ChatOSCore
 import SwiftUI
 
 struct LocalConnectorModelsView: View {
+    @EnvironmentObject private var model: AppModel
     @ObservedObject var viewModel: LocalConnectorControlCenterViewModel
     @State private var settingsDraft = LocalConnectorModelSettings(
         modelRequestMaxRetries: 5,
@@ -13,34 +14,42 @@ struct LocalConnectorModelsView: View {
     @State private var validationMessage: String?
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                actionBar
-                if let validationMessage {
+        SettingsGroupedPage {
+            actionBar
+            if let validationMessage {
+                LocalConnectorCard(
+                    model.localized("配置检查", english: "Configuration Check"),
+                    systemImage: "exclamationmark.triangle.fill"
+                ) {
                     Label(validationMessage, systemImage: "exclamationmark.triangle.fill")
                         .appFont(.callout)
                         .foregroundStyle(.orange)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12)
-                        .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
                 }
+            }
 
-                if let catalog = viewModel.modelCatalog {
-                    LocalConnectorModelDefaultsSection(
-                        models: catalog.items,
-                        settings: $settingsDraft
-                    )
-                    retrySection
-                    LocalConnectorTaskModelsSection(
-                        models: catalog.items,
-                        drafts: $taskDrafts
-                    )
-                } else {
-                    ProgressView("正在读取完整模型配置…")
+            if let catalog = viewModel.modelCatalog {
+                LocalConnectorModelDefaultsSection(
+                    models: catalog.items,
+                    settings: $settingsDraft
+                )
+                retrySection
+                LocalConnectorTaskModelsSection(
+                    models: catalog.items,
+                    drafts: $taskDrafts
+                )
+            } else {
+                LocalConnectorCard(
+                    model.localized("模型配置", english: "Model Configuration"),
+                    systemImage: "brain.head.profile"
+                ) {
+                    ProgressView(model.localized(
+                        "正在读取完整模型配置…",
+                        english: "Loading the complete model configuration…"
+                    ))
                         .frame(maxWidth: .infinity, minHeight: 260)
                 }
             }
-            .padding(24)
         }
         .sheet(isPresented: $showingProviderManager) {
             LocalConnectorProviderManagerSheet(viewModel: viewModel)
@@ -52,40 +61,48 @@ struct LocalConnectorModelsView: View {
     }
 
     private var actionBar: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("统一模型配置")
-                    .appFont(.title3.weight(.semibold))
-                Text("供应商与云端默认模型保存在 ChatOS；本机审批模型只保存在这台 Mac。")
-                    .appFont(.caption)
-                    .foregroundStyle(.secondary)
+        LocalConnectorCard(
+            model.localized("统一模型配置", english: "Unified Model Configuration"),
+            subtitle: model.localized(
+                "供应商与云端默认模型保存在 ChatOS；本机审批模型只保存在这台 Mac。",
+                english: "Providers and cloud defaults are stored in ChatOS; the local approval model stays on this Mac."
+            ),
+            systemImage: "slider.horizontal.3"
+        ) {
+            HStack(spacing: 10) {
+                Button(model.localized("管理供应商", english: "Manage Providers"), systemImage: "server.rack") {
+                    showingProviderManager = true
+                }
+                Button(model.localized("同步", english: "Sync"), systemImage: "arrow.triangle.2.circlepath") {
+                    viewModel.loadModels(refresh: true)
+                }
+                Spacer()
+                Button(model.localized("保存全部", english: "Save All"), systemImage: "checkmark") { save() }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(viewModel.isPerformingAction || viewModel.modelCatalog == nil)
             }
-            Spacer()
-            Button("管理供应商", systemImage: "server.rack") {
-                showingProviderManager = true
-            }
-            Button("同步", systemImage: "arrow.triangle.2.circlepath") {
-                viewModel.loadModels(refresh: true)
-            }
-            Button("保存全部", systemImage: "checkmark") { save() }
-                .buttonStyle(.borderedProminent)
-                .disabled(viewModel.isPerformingAction || viewModel.modelCatalog == nil)
         }
-        .padding(16)
-        .background(.background, in: RoundedRectangle(cornerRadius: 14))
-        .overlay { RoundedRectangle(cornerRadius: 14).stroke(.separator.opacity(0.65)) }
     }
 
     private var retrySection: some View {
         LocalConnectorCard(
-            "请求容错",
-            subtitle: "网络波动、限流或上游暂时不可用时的最大重试次数。",
+            model.localized("请求容错", english: "Request Resilience"),
+            subtitle: model.localized(
+                "网络波动、限流或上游暂时不可用时的最大重试次数。",
+                english: "Maximum retries for network errors, rate limits, or temporary upstream failures."
+            ),
             systemImage: "arrow.clockwise.circle"
         ) {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("模型请求最大重试次数").appFont(.headline)
-                    Text("允许范围 0–10，默认 5。")
+                    Text(model.localized(
+                        "模型请求最大重试次数",
+                        english: "Maximum model request retries"
+                    )).appFont(.headline)
+                    Text(model.localized(
+                        "允许范围 0–10，默认 5。",
+                        english: "Allowed range: 0–10. Default: 5."
+                    ))
                         .appFont(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -97,8 +114,11 @@ struct LocalConnectorModelsView: View {
                     ),
                     in: 0...10
                 ) {
-                    Text("\(settingsDraft.modelRequestMaxRetries ?? 5) 次")
-                        .monospacedDigit()
+                    Text(model.localized(
+                        "\(settingsDraft.modelRequestMaxRetries ?? 5) 次",
+                        english: "\(settingsDraft.modelRequestMaxRetries ?? 5)"
+                    ))
+                        .appFont(.body.monospacedDigit())
                         .frame(width: 48, alignment: .trailing)
                 }
                 .fixedSize()

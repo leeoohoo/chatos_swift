@@ -14,9 +14,10 @@ struct TaskInspectorTitle: View {
 
 struct TaskRunEventTimeline: View {
     let events: [MessageTaskRunEvent]
+    var allowsTextSelection = true
 
     var body: some View {
-        LazyVStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 12) {
             Text("运行事件 · \(events.count)").appFont(.subheadline.weight(.semibold))
             ForEach(events) { event in
                 HStack(alignment: .top, spacing: 10) {
@@ -38,7 +39,7 @@ struct TaskRunEventTimeline: View {
                             Text(message)
                                 .appFont(.caption)
                                 .foregroundStyle(.secondary)
-                                .textSelection(.enabled)
+                                .appTextSelection(allowsTextSelection)
                         }
                     }
                 }

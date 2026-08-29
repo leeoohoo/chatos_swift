@@ -75,4 +75,12 @@ final class AuthenticationViewModel: ObservableObject {
         phase = .signedOut
         Task { await service.logout() }
     }
+
+    func expireSession() {
+        guard case .authenticated = phase else { return }
+        password = ""
+        errorMessage = "登录状态已失效，请重新登录。"
+        phase = .signedOut
+        Task { await service.logout() }
+    }
 }

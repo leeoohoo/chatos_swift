@@ -29,6 +29,15 @@ final class ProjectPlanViewModel: ObservableObject {
         case documents = "技术文档"
         case tasks = "任务"
         var id: Self { self }
+
+        func title(language: ChatOSLanguage) -> String {
+            guard language == .english else { return rawValue }
+            return switch self {
+            case .requirement: "Requirement"
+            case .documents: "Technical Documents"
+            case .tasks: "Tasks"
+            }
+        }
     }
 
     let projectID: String

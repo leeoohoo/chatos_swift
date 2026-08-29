@@ -3,6 +3,15 @@ import Foundation
 
 @MainActor
 final class ProjectRunSettingsViewModel: ObservableObject {
+    enum Notice: Equatable {
+        case analyzed
+        case defaultTargetSaved
+        case environmentSaved
+        case instanceStarted
+        case stopRequested
+        case instanceDeleted
+    }
+
     struct EnvironmentVariableDraft: Identifiable, Equatable {
         let id: UUID
         var key: String
@@ -21,7 +30,7 @@ final class ProjectRunSettingsViewModel: ObservableObject {
     @Published var environmentVariables: [EnvironmentVariableDraft] = []
     @Published private(set) var isLoading = false
     @Published private(set) var isMutating = false
-    @Published private(set) var message: String?
+    @Published private(set) var notice: Notice?
     @Published private(set) var errorMessage: String?
 
     let projectID: String
@@ -64,7 +73,7 @@ final class ProjectRunSettingsViewModel: ObservableObject {
     }
 
     func analyze() async {
-        await mutate(successMessage: "项目运行目标已重新分析。") {
+        await mutate(successNotice: .analyzed) {
             let catalog = try await service.analyze(projectID: projectID)
             self.catalog = catalog
             selectedTargetID = catalog.defaultTargetID ?? catalog.targets.first?.id
@@ -76,7 +85,7 @@ final class ProjectRunSettingsViewModel: ObservableObject {
     func selectTarget(_ id: String?) async {
         selectedTargetID = id
         guard let id else { return }
-        await mutate(successMessage: "默认运行目标已保存。") {
+        await mutate(successNotice: .defaultTargetSaved) {
             catalog = try await service.setDefaultTarget(projectID: projectID, targetID: id)
             environment = try await service.fetchEnvironment(projectID: projectID)
             applyEnvironmentDrafts()
@@ -91,7 +100,7 @@ final class ProjectRunSettingsViewModel: ObservableObject {
             },
             uniquingKeysWith: { _, latest in latest }
         )
-        await mutate(successMessage: "工具链和环境变量已保存。") {
+        await mutate(successNotice: .environmentSaved) {
             environment = try await service.updateEnvironment(
                 projectID: projectID,
                 selectedToolchains: selectedToolchains,
@@ -107,7 +116,7 @@ final class ProjectRunSettingsViewModel: ObservableObject {
 
     func start() async {
         guard let selectedTargetID else { return }
-        await mutate(successMessage: "运行实例已启动。") {
+        await mutate(successNotice: .instanceStarted) {
             try await service.start(projectID: projectID, targetID: selectedTargetID)
             try await Task.sleep(for: .milliseconds(450))
             state = try await service.fetchState(projectID: projectID)
@@ -117,7 +126,7 @@ final class ProjectRunSettingsViewModel: ObservableObject {
 
     func stop(instanceID: String? = nil) async {
         guard let instanceID = instanceID ?? selectedInstanceID else { return }
-        await mutate(successMessage: "已向实例发送停止信号。") {
+        await mutate(successNotice: .stopRequested) {
             try await service.stop(instanceID: instanceID)
             try await Task.sleep(for: .milliseconds(300))
             state = try await service.fetchState(projectID: projectID)
@@ -126,7 +135,7 @@ final class ProjectRunSettingsViewModel: ObservableObject {
 
     func deleteInstance(instanceID: String? = nil) async {
         guard let instanceID = instanceID ?? selectedInstanceID else { return }
-        await mutate(successMessage: "运行实例已删除。") {
+        await mutate(successNotice: .instanceDeleted) {
             try await service.delete(instanceID: instanceID)
             state = try await service.fetchState(projectID: projectID)
             self.selectedInstanceID = state?.instances.first?.id
@@ -134,7 +143,7 @@ final class ProjectRunSettingsViewModel: ObservableObject {
     }
 
     func dismissError() { errorMessage = nil }
-    func dismissMessage() { message = nil }
+    func dismissMessage() { notice = nil }
 
     private func apply(catalog: ProjectRunCatalog, state: ProjectRunState, environment: ProjectRunEnvironment) {
         self.catalog = catalog
@@ -152,13 +161,13 @@ final class ProjectRunSettingsViewModel: ObservableObject {
             .map { .init(key: $0.key, value: $0.value) }
     }
 
-    private func mutate(successMessage: String, operation: () async throws -> Void) async {
+    private func mutate(successNotice: Notice, operation: () async throws -> Void) async {
         isMutating = true
         errorMessage = nil
-        message = nil
+        notice = nil
         do {
             try await operation()
-            message = successMessage
+            notice = successNotice
         } catch {
             errorMessage = error.localizedDescription
         }

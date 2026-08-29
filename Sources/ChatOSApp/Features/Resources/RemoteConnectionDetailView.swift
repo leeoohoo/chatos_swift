@@ -12,14 +12,14 @@ struct RemoteConnectionDetailView: View {
     @State private var errorMessage: String?
     @State private var verificationPrompt: String?
     @State private var verificationCode = ""
+    @State private var selectedTab: RemoteConnectionWorkspaceTab = .terminal
 
     var body: some View {
         Group {
             if let connection {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
+                VStack(spacing: 0) {
+                    VStack(alignment: .leading, spacing: 14) {
                         connectionHeader(connection)
-                        connectionDetails(connection)
                         if let notice {
                             Label(notice, systemImage: "checkmark.circle.fill")
                                 .foregroundStyle(.green)
@@ -28,15 +28,40 @@ struct RemoteConnectionDetailView: View {
                             Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
                                 .foregroundStyle(.orange)
                         }
-                        ContentUnavailableView(
-                            "远端 Terminal 与文件",
-                            systemImage: "terminal",
-                            description: Text("连接管理已经接通；下一项将实现 Terminal 会话和 SFTP 工作区。")
-                        )
-                        .frame(maxWidth: .infinity, minHeight: 260)
-                        .background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 14))
+
+                        Picker("远端工作区", selection: $selectedTab) {
+                            ForEach(RemoteConnectionWorkspaceTab.allCases) { tab in
+                                Label(
+                                    tab.title(language: model.interfaceLanguage),
+                                    systemImage: tab.systemImage
+                                )
+                                .tag(tab)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(maxWidth: 360)
                     }
                     .padding(22)
+
+                    Divider()
+
+                    switch selectedTab {
+                    case .terminal:
+                        RemoteTerminalWorkspaceView(
+                            connection: connection,
+                            service: model.remoteConnectionService
+                        )
+                    case .files:
+                        RemoteSFTPWorkspaceView(
+                            connectionID: connection.id,
+                            service: model.remoteFileService
+                        )
+                    case .details:
+                        ScrollView {
+                            connectionDetails(connection)
+                                .padding(22)
+                        }
+                    }
                 }
                 .navigationTitle(connection.name)
                 .toolbar { toolbar(connection) }
@@ -53,7 +78,6 @@ struct RemoteConnectionDetailView: View {
             RemoteConnectionEditorSheetHost(
                 editingConnection: connection,
                 connections: model.remoteConnections,
-                connectorStatus: model.localConnectorControl.status,
                 service: model.remoteConnectionService,
                 onSaved: model.registerRemoteConnection
             )
@@ -92,17 +116,41 @@ struct RemoteConnectionDetailView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            StatusCapsule(title: isTesting ? "测试中" : "已保存", color: isTesting ? .orange : .green)
+            StatusCapsule(
+                title: isTesting
+                    ? model.localized("测试中", english: "Testing")
+                    : model.localized("已保存", english: "Saved"),
+                color: isTesting ? .orange : .green
+            )
         }
     }
 
     private func connectionDetails(_ connection: RemoteConnection) -> some View {
         Grid(alignment: .leading, horizontalSpacing: 26, verticalSpacing: 12) {
-            detailRow("认证方式", authenticationLabel(connection.authenticationType))
-            detailRow("主机密钥", connection.hostKeyPolicy == .strict ? "严格校验" : "首次接受新密钥")
-            detailRow("默认目录", connection.defaultRemotePath ?? "登录目录")
-            detailRow("本机工作区", workspaceLabel(connection.localConnectorWorkspaceID))
-            detailRow("跳板机", connection.jumpEnabled ? jumpLabel(connection) : "未启用")
+            detailRow(
+                model.localized("认证方式", english: "Authentication"),
+                authenticationLabel(connection.authenticationType)
+            )
+            detailRow(
+                model.localized("主机密钥", english: "Host Key"),
+                connection.hostKeyPolicy == .strict
+                    ? model.localized("严格校验", english: "Strict Verification")
+                    : model.localized("首次接受新密钥", english: "Accept New Key on First Connection")
+            )
+            detailRow(
+                model.localized("默认目录", english: "Default Folder"),
+                connection.defaultRemotePath ?? model.localized("登录目录", english: "Login Folder")
+            )
+            detailRow(
+                model.localized("执行位置", english: "Execution Location"),
+                model.localized("这台 Mac · ChatOS 客户端", english: "This Mac · ChatOS Client")
+            )
+            detailRow(
+                model.localized("跳板机", english: "Jump Host"),
+                connection.jumpEnabled
+                    ? jumpLabel(connection)
+                    : model.localized("未启用", english: "Disabled")
+            )
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -148,7 +196,8 @@ struct RemoteConnectionDetailView: View {
                 id: connectionID,
                 verificationCode: code
             )
-            notice = result.message?.nonEmpty ?? "连接测试成功。"
+            notice = result.message?.nonEmpty
+                ?? model.localized("连接测试成功。", english: "Connection test succeeded.")
             verificationPrompt = nil
             verificationCode = ""
         } catch let challenge as RemoteVerificationChallenge {
@@ -170,7 +219,7 @@ struct RemoteConnectionDetailView: View {
     private var verificationSheet: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("SSH 二次验证").appFont(.title3.weight(.semibold))
-            Text(verificationPrompt ?? "请输入验证码。")
+            Text(verificationPrompt ?? model.localized("请输入验证码。", english: "Enter the verification code."))
                 .appFont(.body).foregroundStyle(.secondary)
             TextField("验证码", text: $verificationCode).textFieldStyle(.roundedBorder)
             HStack {
@@ -190,15 +239,10 @@ struct RemoteConnectionDetailView: View {
 
     private func authenticationLabel(_ type: RemoteAuthenticationType) -> String {
         switch type {
-        case .privateKey: "私钥"
-        case .privateKeyCertificate: "私钥 + 证书"
-        case .password: "密码"
+        case .privateKey: model.localized("私钥", english: "Private Key")
+        case .privateKeyCertificate: model.localized("私钥 + 证书", english: "Private Key + Certificate")
+        case .password: model.localized("密码", english: "Password")
         }
-    }
-
-    private func workspaceLabel(_ id: String) -> String {
-        model.localConnectorControl.status?.workspaces.first(where: { $0.id == id })?.alias
-            ?? "工作区不可用"
     }
 
     private func jumpLabel(_ connection: RemoteConnection) -> String {
@@ -207,7 +251,32 @@ struct RemoteConnectionDetailView: View {
             return "\(jump.name)（\(jump.username)@\(jump.host)）"
         }
         if let host = connection.jumpHost { return host }
-        return "已启用"
+        return model.localized("已启用", english: "Enabled")
+    }
+}
+
+private enum RemoteConnectionWorkspaceTab: String, CaseIterable, Identifiable {
+    case terminal = "远程终端"
+    case files = "SFTP 文件"
+    case details = "连接信息"
+
+    var id: Self { self }
+
+    func title(language: ChatOSLanguage) -> String {
+        guard language == .english else { return rawValue }
+        return switch self {
+        case .terminal: "Remote Terminal"
+        case .files: "SFTP Files"
+        case .details: "Connection Details"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .terminal: "terminal"
+        case .files: "externaldrive.connected.to.line.below"
+        case .details: "info.circle"
+        }
     }
 }
 

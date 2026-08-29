@@ -37,7 +37,7 @@ public struct ChatOSProjectPlanService: ProjectPlanServicing {
     }
 
     public func fetchExecution(projectID: String, requirementID: String) async throws -> ProjectRequirementExecutionLaunch? {
-        let response: ExecutionDTO = try await client.request(
+        let response: ProjectRequirementExecutionDTO = try await client.request(
             "/projects/\(projectID.pathEncoded)/requirements/\(requirementID.pathEncoded)/execution-plan"
         )
         guard response.found != false,
@@ -63,7 +63,7 @@ public struct ChatOSProjectPlanService: ProjectPlanServicing {
                 planningFeedback: planningFeedback?.nonEmpty
             )
         )
-        let response: ExecutionDTO = try await client.request(
+        let response: ProjectRequirementExecutionDTO = try await client.request(
             "/projects/\(projectID.pathEncoded)/requirements/\(requirementID.pathEncoded)/execute",
             method: "POST",
             body: body
@@ -243,7 +243,7 @@ private struct DocumentDTO: Decodable, Sendable {
     }
 }
 
-private struct ExecutionDTO: Decodable, Sendable {
+struct ProjectRequirementExecutionDTO: Decodable, Sendable {
     var found: Bool?
     var projectID: String?
     var requirementID: String?
@@ -256,6 +256,8 @@ private struct ExecutionDTO: Decodable, Sendable {
     var hasStartedRuns: Bool?
     var taskCount: Int?
     var includePrerequisiteDependents: Bool?
+    var failureKind: String?
+    var failureReason: String?
     var createdAt: String?
     enum CodingKeys: String, CodingKey {
         case found
@@ -270,6 +272,8 @@ private struct ExecutionDTO: Decodable, Sendable {
         case hasStartedRuns = "has_started_runs"
         case taskCount = "task_count"
         case includePrerequisiteDependents = "include_prerequisite_dependents"
+        case failureKind = "failure_kind"
+        case failureReason = "failure_reason"
         case createdAt = "created_at"
     }
 
@@ -291,6 +295,8 @@ private struct ExecutionDTO: Decodable, Sendable {
             contactID: contactID,
             taskCount: taskCount ?? 0,
             includePrerequisiteDependents: includePrerequisiteDependents ?? false,
+            failureKind: failureKind,
+            failureReason: failureReason,
             createdAt: APIDateParser.parse(createdAt)
         )
     }

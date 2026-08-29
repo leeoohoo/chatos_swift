@@ -28,15 +28,37 @@ extension SessionMessageDTO {
               let taskID = taskRunner.string(at: "task_id")?.trimmedNonEmpty else {
             return nil
         }
+        let event = taskRunner.string(at: "event")?.trimmedNonEmpty
+        let status = taskRunner.string(at: "status")?.trimmedNonEmpty
         return TaskRunnerCallbackReference(
             taskID: taskID,
             runID: taskRunner.string(at: "run_id")?.trimmedNonEmpty,
-            event: taskRunner.string(at: "event")?.trimmedNonEmpty,
-            status: taskRunner.string(at: "status")?.trimmedNonEmpty,
+            event: event,
+            status: resolvedCallbackStatus(event: event, status: status),
             sourceSessionID: taskRunner.string(at: "source_session_id")?.trimmedNonEmpty,
             sourceTurnID: taskRunner.string(at: "source_turn_id")?.trimmedNonEmpty,
             sourceUserMessageID: taskRunner.string(at: "source_user_message_id")?.trimmedNonEmpty
         )
+    }
+
+    private func resolvedCallbackStatus(event: String?, status: String?) -> String? {
+        let normalizedStatus = status?.lowercased()
+        switch normalizedStatus {
+        case "completed", "succeeded", "success", "done": return "completed"
+        case "failed", "error": return "failed"
+        case "blocked": return "blocked"
+        case "cancelled", "canceled", "stopped": return "cancelled"
+        default: break
+        }
+
+        switch event?.lowercased() {
+        case "task.completed": return "completed"
+        case "task.failed": return "failed"
+        case "task.blocked": return "blocked"
+        case "task.cancelled", "task.canceled": return "cancelled"
+        case "task.run.started", "task.started": return normalizedStatus ?? "running"
+        default: return normalizedStatus
+        }
     }
 }
 

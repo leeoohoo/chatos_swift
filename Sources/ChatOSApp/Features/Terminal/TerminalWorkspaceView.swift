@@ -1,52 +1,97 @@
 import SwiftUI
 
 struct TerminalWorkspaceView: View {
-    @StateObject private var terminal = TerminalViewModel()
-    @FocusState private var commandFocused: Bool
+    @EnvironmentObject private var model: AppModel
+    @StateObject private var workspace = TerminalWorkspaceViewModel()
 
     var body: some View {
         VStack(spacing: 0) {
-            TerminalTabsView()
+            TerminalTabsView(
+                sessions: workspace.sessions,
+                selectedSessionID: workspace.selectedSessionID,
+                onSelect: workspace.selectTerminal,
+                onClose: workspace.closeTerminal,
+                onAdd: workspace.createTerminal
+            )
             Divider()
-            TerminalHeaderView(terminal: terminal)
-            Divider()
-            viewport
-            Divider()
-            TerminalStatusBar(terminal: terminal)
+            if let session = workspace.selectedSession {
+                TerminalSessionView(terminal: session.terminal)
+                    .id(session.id)
+            }
         }
-        .navigationTitle("test_project")
+        .navigationTitle(
+            workspace.selectedSession?.title
+                ?? model.localized("终端", english: "Terminal")
+        )
         .toolbar { toolbar }
-        .onAppear { commandFocused = true }
     }
 
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
-            TextField("搜索终端输出", text: $terminal.searchText)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 190)
+            if let terminal = workspace.selectedSession?.terminal {
+                TextField(
+                    model.localized("搜索终端输出", english: "Search terminal output"),
+                    text: Binding(
+                        get: { terminal.searchText },
+                        set: { terminal.searchText = $0 }
+                    )
+                )
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 190)
 
-            Menu {
-                Button("清屏", systemImage: "eraser", action: terminal.clear)
-                Button("重新连接", systemImage: "arrow.clockwise") {}
-                Divider()
-                Button("关闭终端", systemImage: "xmark") {}
-                Button("删除终端", systemImage: "trash", role: .destructive) {}
-            } label: {
-                Image(systemName: "ellipsis.circle")
+                Menu {
+                    Button(
+                        model.localized("清屏", english: "Clear"),
+                        systemImage: "eraser",
+                        action: terminal.clear
+                    )
+                    Divider()
+                    Button(
+                        model.localized("关闭终端", english: "Close Terminal"),
+                        systemImage: "xmark",
+                        action: workspace.closeSelectedTerminal
+                    )
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
             }
         }
+    }
+}
+
+struct TerminalSessionView: View {
+    @ObservedObject var terminal: TerminalViewModel
+    var onSubmit: (() -> Void)?
+    var showsHeader: Bool
+    @FocusState private var commandFocused: Bool
+
+    init(
+        terminal: TerminalViewModel,
+        onSubmit: (() -> Void)? = nil,
+        showsHeader: Bool = true
+    ) {
+        self.terminal = terminal
+        self.onSubmit = onSubmit
+        self.showsHeader = showsHeader
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if showsHeader {
+                TerminalHeaderView(terminal: terminal)
+                Divider()
+            }
+            viewport
+        }
+        .onAppear { restoreCommandFocus() }
+        .onChange(of: terminal.focusRequestRevision) { restoreCommandFocus() }
     }
 
     private var viewport: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 8) {
-                    Button("加载更早输出", systemImage: "arrow.up") {}
-                        .controlSize(.small)
-                        .frame(maxWidth: .infinity)
-                        .padding(.bottom, 8)
-
                     ForEach(terminal.visibleLines) { line in
                         TerminalLineView(line: line, promptPath: promptPath)
                             .id(line.id)
@@ -57,7 +102,7 @@ struct TerminalWorkspaceView: View {
                         isRunning: terminal.isRunning,
                         promptPath: promptPath,
                         isFocused: $commandFocused,
-                        onSubmit: terminal.submit
+                        onSubmit: onSubmit ?? terminal.submit
                     )
                     .id("prompt")
                 }
@@ -77,5 +122,12 @@ struct TerminalWorkspaceView: View {
 
     private var promptPath: String {
         URL(fileURLWithPath: terminal.workingDirectory).lastPathComponent
+    }
+
+    private func restoreCommandFocus() {
+        Task { @MainActor in
+            await Task.yield()
+            commandFocused = true
+        }
     }
 }

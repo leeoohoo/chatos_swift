@@ -1,3 +1,4 @@
+import ChatOSConnector
 import ChatOSCore
 import Foundation
 
@@ -6,6 +7,14 @@ enum RemoteJumpMode: String, CaseIterable, Identifiable {
     case manual = "手动配置"
 
     var id: Self { self }
+
+    func title(language: ChatOSLanguage) -> String {
+        guard language == .english else { return rawValue }
+        return switch self {
+        case .existing: "Existing Connection"
+        case .manual: "Manual Configuration"
+        }
+    }
 }
 
 @MainActor
@@ -20,7 +29,6 @@ final class RemoteConnectionEditorViewModel: ObservableObject {
     @Published var certificatePath = ""
     @Published var defaultRemotePath = ""
     @Published var hostKeyPolicy: RemoteHostKeyPolicy = .strict
-    @Published var workspaceID = ""
     @Published var jumpEnabled = false
     @Published var jumpMode: RemoteJumpMode = .manual
     @Published var jumpConnectionID = ""
@@ -39,21 +47,16 @@ final class RemoteConnectionEditorViewModel: ObservableObject {
 
     let editingConnection: RemoteConnection?
     let connections: [RemoteConnection]
-    let workspaces: [LocalConnectorWorkspace]
-    let deviceID: String?
 
     private let service: any RemoteConnectionServicing
 
     init(
         editingConnection: RemoteConnection?,
         connections: [RemoteConnection],
-        connectorStatus: LocalConnectorStatus?,
         service: any RemoteConnectionServicing
     ) {
         self.editingConnection = editingConnection
         self.connections = connections
-        self.workspaces = connectorStatus?.workspaces ?? []
-        self.deviceID = connectorStatus?.deviceID
         self.service = service
 
         if let connection = editingConnection {
@@ -64,7 +67,6 @@ final class RemoteConnectionEditorViewModel: ObservableObject {
             authenticationType = connection.authenticationType
             defaultRemotePath = connection.defaultRemotePath ?? ""
             hostKeyPolicy = connection.hostKeyPolicy
-            workspaceID = connection.localConnectorWorkspaceID
             jumpEnabled = connection.jumpEnabled
             jumpMode = connection.jumpConnectionID == nil ? .manual : .existing
             jumpConnectionID = connection.jumpConnectionID ?? ""
@@ -72,9 +74,6 @@ final class RemoteConnectionEditorViewModel: ObservableObject {
             jumpPort = String(connection.jumpPort ?? 22)
             jumpUsername = connection.jumpUsername ?? ""
         } else {
-            workspaceID = connectorStatus?.defaultWorkspaceID
-                ?? connectorStatus?.workspaces.first?.id
-                ?? ""
             if !connections.isEmpty { jumpMode = .existing }
         }
     }
@@ -149,14 +148,10 @@ final class RemoteConnectionEditorViewModel: ObservableObject {
     }
 
     private func buildDraft() throws -> RemoteConnectionDraft {
-        guard let deviceID else { throw FormError("本机还没有连接到 ChatOS 网关。") }
         let host = host.trimmingCharacters(in: .whitespacesAndNewlines)
         let username = username.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !host.isEmpty else { throw FormError("请输入远端主机地址。") }
         guard !username.isEmpty else { throw FormError("请输入登录用户名。") }
-        guard workspaces.contains(where: { $0.id == workspaceID }) else {
-            throw FormError("请选择可用的本机执行工作区。")
-        }
         guard let port = Int(port), (1...65_535).contains(port) else {
             throw FormError("端口必须在 1 到 65535 之间。")
         }
@@ -229,8 +224,8 @@ final class RemoteConnectionEditorViewModel: ObservableObject {
             certificatePath: authenticationType == .privateKeyCertificate ? certificatePath : nil,
             defaultRemotePath: defaultRemotePath.nonEmpty,
             hostKeyPolicy: hostKeyPolicy,
-            localConnectorDeviceID: deviceID,
-            localConnectorWorkspaceID: workspaceID,
+            localConnectorDeviceID: NativeRemoteConnectionService.nativeDeviceID,
+            localConnectorWorkspaceID: NativeRemoteConnectionService.nativeWorkspaceID,
             jumpEnabled: jumpEnabled,
             jumpConnectionID: resolvedJumpConnectionID,
             jumpHost: resolvedJumpHost,
@@ -238,7 +233,8 @@ final class RemoteConnectionEditorViewModel: ObservableObject {
             jumpUsername: resolvedJumpUsername,
             jumpPrivateKeyPath: resolvedJumpPrivateKeyPath,
             jumpCertificatePath: resolvedJumpCertificatePath,
-            jumpPassword: resolvedJumpPassword
+            jumpPassword: resolvedJumpPassword,
+            localCredentialReferenceID: editingConnection?.id
         )
     }
 }

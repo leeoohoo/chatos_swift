@@ -2,7 +2,9 @@ import ChatOSCore
 import SwiftUI
 
 struct TaskReplyInlineInspectorView: View {
+    @EnvironmentObject private var model: AppModel
     @StateObject private var viewModel: TaskReplyInspectorViewModel
+    let selection: TaskReplySelection
     let requestedSection: TaskReplyInspectorSection
 
     init(
@@ -10,6 +12,7 @@ struct TaskReplyInlineInspectorView: View {
         requestedSection: TaskReplyInspectorSection,
         service: any MessageTaskGraphServicing
     ) {
+        self.selection = selection
         self.requestedSection = requestedSection
         _viewModel = StateObject(
             wrappedValue: TaskReplyInspectorViewModel(selection: selection, service: service)
@@ -19,7 +22,7 @@ struct TaskReplyInlineInspectorView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {
-                Label(viewModel.section.rawValue, systemImage: sectionIcon)
+                Label(viewModel.section.title(language: model.interfaceLanguage), systemImage: sectionIcon)
                     .appFont(.subheadline.weight(.semibold))
                     .foregroundStyle(AppPalette.ai)
                 Spacer()
@@ -38,9 +41,15 @@ struct TaskReplyInlineInspectorView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(AppPalette.ai.opacity(0.16), lineWidth: 1)
         }
-        .task { viewModel.load() }
+        .task {
+            viewModel.update(selection: selection)
+            viewModel.load()
+        }
+        .onChange(of: selection.refreshIdentity) {
+            viewModel.update(selection: selection)
+        }
         .onChange(of: requestedSection) {
-            viewModel.section = requestedSection
+            viewModel.selectSection(requestedSection)
         }
     }
 
@@ -78,7 +87,8 @@ private struct TaskReplyInspectorContent: View {
                         items: TaskProcessTimelineBuilder.build(
                             processLog: task.processLog,
                             taskStatus: task.status
-                        )
+                        ),
+                        allowsTextSelection: false
                     )
                 case .detail:
                     taskDetail(task)
@@ -91,7 +101,8 @@ private struct TaskReplyInspectorContent: View {
     private func taskDetail(_ task: MessageTask) -> some View {
         MessageTaskDetailSections(
             task: task,
-            isLoadingModelOutput: viewModel.isLoadingModelOutput
+            isLoadingModelOutput: viewModel.isLoadingModelOutput,
+            allowsTextSelection: false
         )
         if let modelOutputError = viewModel.modelOutputError {
             Label("模型输出读取失败：\(modelOutputError)", systemImage: "exclamationmark.triangle")

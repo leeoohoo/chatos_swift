@@ -2,6 +2,37 @@ import ChatOSCore
 import Foundation
 
 extension MessageTaskWorkspaceViewModel {
+    func refreshWorkspaceState(refreshInspector: Bool) async {
+        do {
+            applyGraph(
+                try await graphService.fetchGraph(
+                    messageID: turn.userMessage.id,
+                    lookup: baseLookup
+                )
+            )
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        if let service = projectExecutionService,
+           let identity = executionState.identity {
+            do {
+                if let launch = try await service.fetchExecution(identity) {
+                    applyExecution(launch)
+                }
+            } catch {
+                if errorMessage == nil {
+                    errorMessage = "执行计划状态刷新失败：\(error.localizedDescription)"
+                }
+            }
+        }
+
+        if refreshInspector {
+            await refreshSelectedInspectorState()
+        }
+    }
+
     func loadInspector(for task: MessageTask) {
         isLoadingInspector = true
         isLoadingRun = false
@@ -70,7 +101,8 @@ extension MessageTaskWorkspaceViewModel {
     }
 
     func loadRun(for task: MessageTask) {
-        guard let runID = task.lastRunID, !isLoadingRun else { return }
+        let preferredRunID = task.id == initialTaskID ? initialRunID : nil
+        guard let runID = preferredRunID ?? task.lastRunID, !isLoadingRun else { return }
         isLoadingRun = true
         let target = target(for: task)
         let requestedTaskID = task.id
@@ -148,26 +180,99 @@ extension MessageTaskWorkspaceViewModel {
         )
     }
 
-    func startPollingIfNeeded() {
+    func refreshSelectedInspectorState() async {
+        guard let selectedTask else { return }
+        let requestedTaskID = selectedTask.id
+        let target = target(for: selectedTask)
+        do {
+            let detail = try await graphService.fetchTask(
+                messageID: target.messageID,
+                taskID: selectedTask.id,
+                lookup: target.lookup
+            )
+            guard self.selectedTask?.id == requestedTaskID else { return }
+            taskDetail = detail
+
+            guard let runID = detail.lastRunID else {
+                runDetail = nil
+                loadedModelOutputRunID = nil
+                return
+            }
+            switch inspectorSection {
+            case .process:
+                break
+            case .detail:
+                let run = try await graphService.fetchRun(
+                    messageID: target.messageID,
+                    runID: runID,
+                    lookup: target.lookup,
+                    includeEvents: false,
+                    eventLimit: 1,
+                    eventOffset: 0
+                )
+                guard self.selectedTask?.id == requestedTaskID else { return }
+                loadedModelOutputRunID = runID
+                taskDetail = detail.merging(run: run.run)
+            case .run:
+                let run = try await graphService.fetchRun(
+                    messageID: target.messageID,
+                    runID: runID,
+                    lookup: target.lookup,
+                    includeEvents: true,
+                    eventLimit: 40,
+                    eventOffset: 0
+                )
+                guard self.selectedTask?.id == requestedTaskID else { return }
+                runDetail = run
+                loadedModelOutputRunID = runID
+                taskDetail = run.task.merging(run: run.run)
+            }
+        } catch {
+            guard self.selectedTask?.id == requestedTaskID else { return }
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func startRealtime() {
+        guard let realtimeService, realtimeTask == nil else { return }
+        let sessionID = turn.sessionID
+        realtimeTask = Task { [weak self] in
+            let stream = await realtimeService.events(sessionID: sessionID)
+            do {
+                for try await signal in stream {
+                    guard let self, !Task.isCancelled else { return }
+                    self.applyRealtimeSignal(signal)
+                    if signal.turnID == self.turn.id,
+                       [.completed, .failed, .cancelled, .persisted].contains(signal.kind) {
+                        await self.refreshWorkspaceState(refreshInspector: true)
+                        self.startPollingIfNeeded()
+                    }
+                }
+            } catch {
+                guard let self, !Task.isCancelled else { return }
+                if self.errorMessage == nil {
+                    self.errorMessage = "实时进度连接已中断：\(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
+    func startPollingIfNeeded(force: Bool = false) {
         stopPolling()
-        let shouldPoll = graph?.nodes.contains(where: { $0.task.isActive }) == true
-            || executionState.phase == .planning
-        guard shouldPoll else { return }
+        let shouldPoll = executionState.isProjectExecution
+            ? [.planning, .running].contains(executionState.phase)
+            : graph?.nodes.contains(where: { $0.task.isActive }) == true
+        guard force || shouldPoll else { return }
         pollingTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(5))
+                try? await Task.sleep(for: .seconds(2))
                 guard let self, !Task.isCancelled else { return }
-                do {
-                    let graph = try await self.graphService.fetchGraph(
-                        messageID: self.turn.userMessage.id,
-                        lookup: self.baseLookup
-                    )
-                    self.errorMessage = nil
-                    self.applyGraph(graph)
-                    if !graph.nodes.contains(where: { $0.task.isActive }),
-                       self.executionState.phase != .planning { return }
-                } catch {
-                    self.errorMessage = error.localizedDescription
+                await self.refreshWorkspaceState(refreshInspector: true)
+                let shouldContinue = self.executionState.isProjectExecution
+                    ? [.planning, .running].contains(self.executionState.phase)
+                    : self.graph?.nodes.contains(where: { $0.task.isActive }) == true
+                if !shouldContinue {
+                    return
                 }
             }
         }

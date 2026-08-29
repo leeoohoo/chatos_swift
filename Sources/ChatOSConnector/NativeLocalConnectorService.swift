@@ -1,6 +1,7 @@
 import ChatOSCore
 import CryptoKit
 import Foundation
+import OSLog
 
 public struct NativeConnectorConfiguration: Sendable {
     public var gatewayBaseURL: URL
@@ -12,14 +13,23 @@ public struct NativeConnectorConfiguration: Sendable {
     }
 }
 
-public actor NativeLocalConnectorService: LocalConnectorControlServicing {
+public actor NativeLocalConnectorService: LocalConnectorControlServicing, LocalConnectorApprovalStreaming {
     private static let accessTokenAccount = "gateway-access-token-v1"
+    private static let logger = Logger(
+        subsystem: "com.chatos.swift-client",
+        category: "NativeLocalConnector"
+    )
 
     private let configuration: NativeConnectorConfiguration
     private let ticketProvider: any LocalConnectorPairingTicketProviding
     let gateway: NativeConnectorGateway
     let stateStore: NativeConnectorStateStore
     let pluginInstaller: NativePluginInstaller
+    let mcpCodeWriteStore = NativeMCPCodeWriteStore()
+    let mcpTerminalStore = NativeMCPTerminalStore()
+    let pluginRuntimeStore = NativePluginRuntimeStore()
+    let pluginRuntimeRootURL: URL
+    let remoteConnectionRuntime: (any NativeRemoteConnectionRuntimeProviding)?
     private let secretStore = NativeConnectorSecretStore()
     var state: NativeConnectorPersistentState
     private var cachedAccessToken: String?
@@ -29,13 +39,28 @@ public actor NativeLocalConnectorService: LocalConnectorControlServicing {
     var webSocket: URLSessionWebSocketTask?
     private var receiveTask: Task<Void, Never>?
     private var heartbeatTask: Task<Void, Never>?
+    private var reconnectTask: Task<Void, Never>?
+    private var shouldMaintainGatewayConnection = false
+    private var isSystemSleeping = false
+    private var lastGatewayPongAt: Date?
+    private var gatewayReconnectFailureCount = 0
+    private var gatewayConnectionCleanupCount = 0
     var pendingApprovals: [LocalConnectorPendingApproval] = []
     var pendingApprovalContinuations: [String: CheckedContinuation<NativeApprovalDecision, Never>] = [:]
+    var pendingApprovalScopeKeys: [String: String] = [:]
+    var approvalSnapshotContinuations: [
+        UUID: AsyncStream<[LocalConnectorPendingApproval]>.Continuation
+    ] = [:]
+    var approvalEventContinuations: [
+        UUID: AsyncStream<LocalConnectorApprovalEvent>.Continuation
+    ] = [:]
+    var sessionApprovalAllowlist: Set<String> = []
     var seenRelayNonces: [String: Int64] = [:]
 
     public init(
         configuration: NativeConnectorConfiguration,
-        ticketProvider: any LocalConnectorPairingTicketProviding
+        ticketProvider: any LocalConnectorPairingTicketProviding,
+        remoteConnectionRuntime: (any NativeRemoteConnectionRuntimeProviding)? = nil
     ) {
         self.configuration = configuration
         self.ticketProvider = ticketProvider
@@ -46,6 +71,10 @@ public actor NativeLocalConnectorService: LocalConnectorControlServicing {
                 .deletingLastPathComponent()
                 .appendingPathComponent("Plugins", isDirectory: true)
         )
+        self.pluginRuntimeRootURL = configuration.stateURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("PluginRuntime", isDirectory: true)
+        self.remoteConnectionRuntime = remoteConnectionRuntime
         self.state = (try? stateStore.load()) ?? .empty
     }
 
@@ -89,11 +118,13 @@ public actor NativeLocalConnectorService: LocalConnectorControlServicing {
     }
 
     public func disconnect() async throws -> LocalConnectorStatus {
+        shouldMaintainGatewayConnection = false
+        gatewayReconnectFailureCount = 0
         let token = try accessToken()
         if let deviceID = state.deviceID, let token {
             try? await gateway.disconnectDevice(token: token, id: deviceID)
         }
-        stopGatewayConnection()
+        await stopGatewayConnection()
         try secretStore.delete(account: Self.accessTokenAccount)
         cachedAccessToken = nil
         hasLoadedAccessToken = true
@@ -103,6 +134,28 @@ public actor NativeLocalConnectorService: LocalConnectorControlServicing {
         state.workspaces = []
         try stateStore.save(state)
         return statusSnapshot()
+    }
+
+    public func prepareForSystemSleep() async {
+        guard state.deviceID != nil else { return }
+        isSystemSleeping = true
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        await closeGatewayConnection(terminatePluginSessions: true)
+    }
+
+    public func recoverGatewayConnection(forceReconnect: Bool = false) async {
+        guard state.deviceID != nil else { return }
+        isSystemSleeping = false
+        shouldMaintainGatewayConnection = true
+        if forceReconnect {
+            gatewayReconnectFailureCount = 0
+        }
+        if forceReconnect, webSocket != nil {
+            await closeGatewayConnection(terminatePluginSessions: true)
+        }
+        guard webSocket == nil else { return }
+        scheduleGatewayReconnect()
     }
 
     public func fetchRuntimeSettings() async throws -> LocalConnectorRuntimeSettings {
@@ -199,10 +252,33 @@ public actor NativeLocalConnectorService: LocalConnectorControlServicing {
         pendingApprovals
     }
 
+    public func approvalSnapshots() async -> AsyncStream<[LocalConnectorPendingApproval]> {
+        AsyncStream { continuation in
+            let id = UUID()
+            approvalSnapshotContinuations[id] = continuation
+            continuation.yield(pendingApprovals)
+            continuation.onTermination = { [weak self] _ in
+                Task { await self?.removeApprovalSnapshotContinuation(id) }
+            }
+        }
+    }
+
+    public func approvalEvents() async -> AsyncStream<LocalConnectorApprovalEvent> {
+        AsyncStream { continuation in
+            let id = UUID()
+            approvalEventContinuations[id] = continuation
+            continuation.onTermination = { [weak self] _ in
+                Task { await self?.removeApprovalEventContinuation(id) }
+            }
+        }
+    }
+
     public func resolveApproval(id: String, decision: String) async throws {
         let pending = pendingApprovals.first(where: { $0.id == id })
         pendingApprovals.removeAll(where: { $0.id == id })
+        publishApprovalSnapshot()
         let continuation = pendingApprovalContinuations.removeValue(forKey: id)
+        let approvalScopeKey = pendingApprovalScopeKeys.removeValue(forKey: id)
         if let pending {
             state.approvalHistory.insert(
                 .init(
@@ -219,9 +295,27 @@ public actor NativeLocalConnectorService: LocalConnectorControlServicing {
                 at: 0
             )
             try stateStore.save(state)
+            publishApprovalEvent(.init(
+                requestID: pending.requestID,
+                command: pending.command,
+                cwd: pending.cwd,
+                source: pending.source,
+                risk: pending.risk,
+                decision: ["accept", "acceptForSession", "approve"].contains(decision)
+                    ? "approved"
+                    : "denied",
+                reason: decision == "acceptForSession"
+                    ? "用户已允许当前会话继续执行此类操作。"
+                    : (decision == "decline" ? "用户已拒绝这次操作。" : "用户已允许这次操作。"),
+                mode: state.approvalMode,
+                reviewer: .user
+            ))
         }
         switch decision {
         case "accept", "acceptForSession", "approve":
+            if decision == "acceptForSession", let approvalScopeKey {
+                sessionApprovalAllowlist.insert(approvalScopeKey)
+            }
             continuation?.resume(returning: .approve(
                 reason: "用户已在本机批准。",
                 rememberAllow: decision == "acceptForSession"
@@ -335,7 +429,22 @@ public actor NativeLocalConnectorService: LocalConnectorControlServicing {
     }
 
     private func connectGateway() async throws {
-        guard webSocket == nil else { return }
+        shouldMaintainGatewayConnection = true
+        guard webSocket == nil,
+              reconnectTask == nil,
+              gatewayConnectionCleanupCount == 0 else {
+            return
+        }
+        do {
+            try await openGatewayConnection()
+        } catch {
+            recordGatewayReconnectFailure()
+            scheduleGatewayReconnect()
+            throw error
+        }
+    }
+
+    private func openGatewayConnection() async throws {
         let token = try requireAccessToken()
         guard let deviceID = state.deviceID else { throw NativeConnectorError.notPaired }
         let identity = try deviceIdentity()
@@ -365,6 +474,7 @@ public actor NativeLocalConnectorService: LocalConnectorControlServicing {
         let socket = URLSession.shared.webSocketTask(with: request)
         webSocket = socket
         gatewayConnected = false
+        lastGatewayPongAt = nil
         socket.resume()
         receiveTask = Task { [weak self] in await self?.receiveMessages(from: socket) }
         heartbeatTask = Task { [weak self] in await self?.sendHeartbeats(to: socket) }
@@ -372,7 +482,7 @@ public actor NativeLocalConnectorService: LocalConnectorControlServicing {
 
     private func receiveMessages(from socket: URLSessionWebSocketTask) async {
         do {
-            while webSocket != nil {
+            while webSocket === socket {
                 let message = try await socket.receive()
                 switch message {
                 case let .string(text):
@@ -381,6 +491,19 @@ public actor NativeLocalConnectorService: LocalConnectorControlServicing {
                         switch envelope.type {
                         case "connected":
                             gatewayConnected = true
+                            lastGatewayPongAt = Date()
+                            gatewayReconnectFailureCount = 0
+                            Self.logger.info("Local Connector 网关长连接已建立")
+                            try? await publishPluginInstallationStatus()
+                        case "pong":
+                            lastGatewayPongAt = Date()
+                        case "error":
+                            throw NativeConnectorError.server(
+                                status: 503,
+                                message: envelope.message
+                                    ?? envelope.code
+                                    ?? "Local Connector 网关会话异常"
+                            )
                         case "terminal_exec_request":
                             Task { [weak self] in
                                 await self?.handleTerminalRelayMessage(data, socket: socket)
@@ -388,6 +511,12 @@ public actor NativeLocalConnectorService: LocalConnectorControlServicing {
                         case "mcp":
                             Task { [weak self] in
                                 await self?.handleMCPRelayMessage(data, socket: socket)
+                            }
+                        case "plugin_prepare_request",
+                             "plugin_execute_request",
+                             "plugin_cancel_request":
+                            Task { [weak self] in
+                                await self?.handlePluginRelayMessage(data, socket: socket)
                             }
                         case "workspace_directory_list_request",
                              "workspace_directory_create_request",
@@ -406,16 +535,110 @@ public actor NativeLocalConnectorService: LocalConnectorControlServicing {
                 }
             }
         } catch {
-            gatewayConnected = false
-            if webSocket === socket { webSocket = nil }
+            await handleGatewayConnectionFailure(socket: socket, error: error)
         }
     }
 
     private func sendHeartbeats(to socket: URLSessionWebSocketTask) async {
-        while !Task.isCancelled, webSocket != nil {
-            try? await socket.send(.string("{\"type\":\"heartbeat\"}"))
-            try? await Task.sleep(for: .seconds(15))
+        var missedAcknowledgements = 0
+        while !Task.isCancelled, webSocket === socket {
+            let sentAt = Date()
+            do {
+                try await socket.send(.string("{\"type\":\"heartbeat\"}"))
+                try await Task.sleep(for: .seconds(15))
+            } catch is CancellationError {
+                return
+            } catch {
+                await handleGatewayConnectionFailure(socket: socket, error: error)
+                return
+            }
+            guard webSocket === socket else { return }
+            if let lastGatewayPongAt, lastGatewayPongAt >= sentAt {
+                missedAcknowledgements = 0
+            } else {
+                missedAcknowledgements += 1
+            }
+            if missedAcknowledgements >= 3 {
+                await handleGatewayConnectionFailure(
+                    socket: socket,
+                    error: URLError(.timedOut)
+                )
+                return
+            }
         }
+    }
+
+    private func handleGatewayConnectionFailure(
+        socket: URLSessionWebSocketTask,
+        error: any Error
+    ) async {
+        guard webSocket === socket else { return }
+        Self.logger.error("网关长连接中断：\(error.localizedDescription, privacy: .public)")
+        recordGatewayReconnectFailure()
+        await closeGatewayConnection(terminatePluginSessions: true)
+        scheduleGatewayReconnect()
+    }
+
+    private func scheduleGatewayReconnect() {
+        guard shouldMaintainGatewayConnection,
+              !isSystemSleeping,
+              state.deviceID != nil,
+              webSocket == nil,
+              gatewayConnectionCleanupCount == 0,
+              reconnectTask == nil else {
+            return
+        }
+        reconnectTask = Task { [weak self] in
+            await self?.runGatewayReconnectLoop()
+        }
+    }
+
+    private func runGatewayReconnectLoop() async {
+        defer {
+            reconnectTask = nil
+            if shouldMaintainGatewayConnection,
+               !isSystemSleeping,
+               state.deviceID != nil,
+               webSocket == nil {
+                scheduleGatewayReconnect()
+            }
+        }
+        while !Task.isCancelled,
+              shouldMaintainGatewayConnection,
+              !isSystemSleeping,
+              state.deviceID != nil,
+              webSocket == nil {
+            let delay = Self.gatewayReconnectDelaySeconds(
+                afterFailedAttempts: gatewayReconnectFailureCount
+            )
+            if delay > 0 {
+                Self.logger.info("将在 \(delay, privacy: .public) 秒后重连 Local Connector 网关")
+                do {
+                    try await Task.sleep(for: .seconds(delay))
+                } catch {
+                    return
+                }
+            }
+            do {
+                try await openGatewayConnection()
+                Self.logger.info("已发起 Local Connector 网关重连")
+                return
+            } catch {
+                recordGatewayReconnectFailure()
+                Self.logger.error(
+                    "网关重连失败，将继续重试：\(error.localizedDescription, privacy: .public)"
+                )
+            }
+        }
+    }
+
+    static func gatewayReconnectDelaySeconds(afterFailedAttempts attempts: Int) -> Int {
+        guard attempts > 0 else { return 0 }
+        return min(30, 1 << min(attempts - 1, 5))
+    }
+
+    private func recordGatewayReconnectFailure() {
+        gatewayReconnectFailureCount = min(gatewayReconnectFailureCount + 1, 6)
     }
 
     func publishPluginInstallationStatus() async throws {
@@ -427,21 +650,12 @@ public actor NativeLocalConnectorService: LocalConnectorControlServicing {
         let records = state.installedPluginRecords ?? [:]
         let items = records.values
             .sorted { $0.pluginID < $1.pluginID }
-            .map { record in
-                GatewayPluginInstallationStatusItem(
+            .compactMap { record in
+                try? NativePluginInstallationStatusBuilder.makeItem(
+                    record: record,
                     ownerUserID: ownerUserID,
                     deviceID: deviceID,
-                    pluginID: record.pluginID,
-                    releaseID: record.releaseID,
-                    version: record.version,
-                    artifactSHA256: record.artifactSHA256,
                     platform: Self.pluginPlatform,
-                    installStatus: "installed",
-                    availabilityStatus: "ready",
-                    dependencyStatus: "satisfied",
-                    permissionStatus: "satisfied",
-                    authStatus: "satisfied",
-                    componentStatuses: [],
                     active: state.pluginPreferences[record.pluginID] ?? true
                 )
             }
@@ -465,10 +679,30 @@ public actor NativeLocalConnectorService: LocalConnectorControlServicing {
 #endif
     }
 
-    private func stopGatewayConnection() {
+    private func stopGatewayConnection() async {
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        await closeGatewayConnection(terminatePluginSessions: true)
+    }
+
+    private func closeGatewayConnection(terminatePluginSessions: Bool) async {
+        gatewayConnectionCleanupCount += 1
+        defer {
+            gatewayConnectionCleanupCount -= 1
+            if gatewayConnectionCleanupCount == 0,
+               shouldMaintainGatewayConnection,
+               !isSystemSleeping,
+               state.deviceID != nil,
+               webSocket == nil {
+                scheduleGatewayReconnect()
+            }
+        }
         let continuations = pendingApprovalContinuations.values
         pendingApprovalContinuations.removeAll()
+        pendingApprovalScopeKeys.removeAll()
+        sessionApprovalAllowlist.removeAll()
         pendingApprovals.removeAll()
+        publishApprovalSnapshot()
         for continuation in continuations {
             continuation.resume(returning: .deny(reason: "本机连接器已断开。"))
         }
@@ -479,6 +713,31 @@ public actor NativeLocalConnectorService: LocalConnectorControlServicing {
         webSocket?.cancel(with: .goingAway, reason: nil)
         webSocket = nil
         gatewayConnected = false
+        lastGatewayPongAt = nil
+        if terminatePluginSessions {
+            await pluginRuntimeStore.terminateAll()
+        }
+    }
+
+    func publishApprovalSnapshot() {
+        let snapshot = pendingApprovals
+        for continuation in approvalSnapshotContinuations.values {
+            continuation.yield(snapshot)
+        }
+    }
+
+    func publishApprovalEvent(_ event: LocalConnectorApprovalEvent) {
+        for continuation in approvalEventContinuations.values {
+            continuation.yield(event)
+        }
+    }
+
+    private func removeApprovalSnapshotContinuation(_ id: UUID) {
+        approvalSnapshotContinuations.removeValue(forKey: id)
+    }
+
+    private func removeApprovalEventContinuation(_ id: UUID) {
+        approvalEventContinuations.removeValue(forKey: id)
     }
 
     private func accessToken() throws -> String? {
@@ -508,43 +767,8 @@ public actor NativeLocalConnectorService: LocalConnectorControlServicing {
 
 private struct GatewaySocketEnvelope: Decodable {
     var type: String
-}
-
-private struct GatewayPluginInstallationStatusMessage: Encodable {
-    var type: String
-    var items: [GatewayPluginInstallationStatusItem]
-}
-
-private struct GatewayPluginInstallationStatusItem: Encodable {
-    var ownerUserID: String
-    var deviceID: String
-    var pluginID: String
-    var releaseID: String
-    var version: String
-    var artifactSHA256: String
-    var platform: String
-    var installStatus: String
-    var availabilityStatus: String
-    var dependencyStatus: String
-    var permissionStatus: String
-    var authStatus: String
-    var componentStatuses: [String]
-    var active: Bool
-
-    enum CodingKeys: String, CodingKey {
-        case version, platform, active
-        case ownerUserID = "owner_user_id"
-        case deviceID = "device_id"
-        case pluginID = "plugin_id"
-        case releaseID = "release_id"
-        case artifactSHA256 = "artifact_sha256"
-        case installStatus = "install_status"
-        case availabilityStatus = "availability_status"
-        case dependencyStatus = "dependency_status"
-        case permissionStatus = "permission_status"
-        case authStatus = "auth_status"
-        case componentStatuses = "component_statuses"
-    }
+    var code: String?
+    var message: String?
 }
 
 private extension String {

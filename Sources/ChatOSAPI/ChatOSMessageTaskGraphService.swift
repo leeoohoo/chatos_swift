@@ -81,6 +81,28 @@ public struct ChatOSMessageTaskGraphService: MessageTaskGraphServicing {
         return response.run.model
     }
 
+    public func cancelTask(
+        messageID: String,
+        taskID: String,
+        lookup: MessageTaskLookup?,
+        reason: String?
+    ) async throws {
+        let response: MessageTaskCancelResponseDTO = try await client.request(
+            endpoint(
+                messageID: messageID,
+                suffix: "tasks/\(taskID.urlPathEncoded)/cancel",
+                lookup: lookup
+            ),
+            method: "POST",
+            body: try JSONEncoder().encode(
+                CancelMessageTaskRequestDTO(reason: reason?.trimmedNonEmptyValue)
+            )
+        )
+        guard response.success else {
+            throw ChatOSAPIError.server(statusCode: 409, message: "任务取消未被接受")
+        }
+    }
+
     private func endpoint(
         messageID: String,
         suffix: String,
@@ -110,4 +132,12 @@ private struct RetryRunRequestDTO: Encodable {
     enum CodingKeys: String, CodingKey {
         case retryInstruction = "retry_instruction"
     }
+}
+
+private struct CancelMessageTaskRequestDTO: Encodable {
+    var reason: String?
+}
+
+private struct MessageTaskCancelResponseDTO: Decodable {
+    var success: Bool
 }

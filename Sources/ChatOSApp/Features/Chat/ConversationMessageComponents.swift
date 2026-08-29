@@ -21,7 +21,6 @@ struct UserTurnMessageView: View {
                 }
                 if !turn.userMessage.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Text(turn.userMessage.text)
-                        .textSelection(.enabled)
                 }
                 if !turn.userMessage.attachments.isEmpty {
                     MessageAttachmentChips(attachments: turn.userMessage.attachments)
@@ -64,7 +63,10 @@ struct AssistantReplyView: View {
             agentIcon
             VStack(alignment: .leading, spacing: 5) {
                 replyHeader
-                MarkdownDocumentView(markdown: reply.message.text)
+                MarkdownDocumentView(
+                    markdown: reply.message.text,
+                    allowsTextSelection: false
+                )
             }
         }
     }
@@ -86,6 +88,7 @@ struct AssistantReplyView: View {
 }
 
 struct TaskAgentReplyView: View {
+    @EnvironmentObject private var model: AppModel
     let reply: ConversationAssistantReply
     let expandedSection: TaskReplyInspectorSection?
     let onToggleInspector: (TaskReplyInspectorSection) -> Void
@@ -106,7 +109,10 @@ struct TaskAgentReplyView: View {
                     }
                     Spacer()
                 }
-                MarkdownDocumentView(markdown: reply.message.text)
+                MarkdownDocumentView(
+                    markdown: reply.message.text,
+                    allowsTextSelection: false
+                )
                 HStack(spacing: 14) {
                     inspectorButton(
                         title: "执行过程",
@@ -132,7 +138,7 @@ struct TaskAgentReplyView: View {
         return Button {
             onToggleInspector(section)
         } label: {
-            Label(title, systemImage: icon)
+            Label(LocalizedStringKey(title), systemImage: icon)
                 .appFont(.caption.weight(.medium))
                 .padding(.horizontal, 9)
                 .padding(.vertical, 5)
@@ -143,7 +149,9 @@ struct TaskAgentReplyView: View {
                 )
         }
         .buttonStyle(.plain)
-        .help(isSelected ? "再次点击收起" : "在当前消息下方展开")
+        .help(isSelected
+              ? model.localized("再次点击收起", english: "Click again to collapse")
+              : model.localized("在当前消息下方展开", english: "Expand below the current message"))
     }
 
     private func statusTitle(_ status: String?) -> String {

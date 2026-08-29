@@ -195,11 +195,11 @@ struct NativeApprovalAgent: Sendable {
 
     private func prompt(for request: NativeApprovalAgentRequest) -> String {
         """
-        请审核下面这条本地 shell 命令。必要时先使用只读工具检查项目，再调用 approval_decision。
+        请审核下面这次本机操作。它可能是 shell 命令，也可能是 Browser CDP、Computer Use 或其他本机 Plugin 操作。必要时先使用只读工具检查项目，再调用 approval_decision。
 
         - source: \(request.source)
         - cwd: \(request.cwd)
-        - command: \(([request.command] + request.arguments).joined(separator: " "))
+        - operation: \(([request.command] + request.arguments).joined(separator: " "))
         - requested_permissions: \(request.requestedPermissionsDescription ?? "null")
         - static_risk_level: \(request.riskLevel)
         - static_risk_reason: \(request.riskReason ?? "无")
@@ -209,11 +209,12 @@ struct NativeApprovalAgent: Sendable {
         2. 信息不足、路径不明确、请求范围过大或存在不可逆风险时，必须 ask_user。
         3. deny 用于明确恶意、越权或与用户目标冲突的操作。
         4. approve 只用于意图清晰、范围受控且与当前项目任务一致的操作。
+        5. Browser CDP、Computer Use 和其他 Plugin 操作不是 shell 命令，不要因为项目中找不到同名文件而拒绝或追问。ChatOS 生成的 browser_session_id、tab_id、cdp_session_id 等不透明标识属于正常会话边界，应结合工具名、参数摘要和权限说明判断。
         """
     }
 
     private static let systemPrompt = """
-    你是 ChatOS 运行在用户 Mac 上的命令审批 Agent。你只能使用提供的只读项目工具进行核对，最终必须调用 approval_decision。你不得把普通文字回答当作审批结论，不得执行命令、写文件或访问项目根目录之外的路径。无法可靠判断时必须 ask_user。
+    你是 ChatOS 运行在用户 Mac 上的本机操作审批 Agent，负责审核 shell 命令、Browser CDP、Computer Use 和其他本机 Plugin 操作。你只能使用提供的只读项目工具进行核对，最终必须调用 approval_decision。你不得把普通文字回答当作审批结论，不得执行命令、写文件或访问项目根目录之外的路径。无法可靠判断时必须 ask_user。
     """
 
     private static var toolSchemas: [[String: Any]] { [

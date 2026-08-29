@@ -7,7 +7,8 @@ struct ProjectMessagesView: View {
     var body: some View {
         let resource = model.projects.first(where: { $0.id == projectID })
         let projectName = resource?.title ?? projectID
-        let contactName = resource?.contactName ?? "项目联系人"
+        let contactName = resource?.contactName
+            ?? model.localized("项目联系人", english: "Project Contact")
 
         Group {
             if let conversation = model.projectConversation {
@@ -21,28 +22,40 @@ struct ProjectMessagesView: View {
                 VStack(spacing: 12) {
                     ProgressView()
                         .controlSize(.large)
-                    Text("正在连接“叽咕狸”…")
+                    Text(model.localized("正在连接“叽咕狸”…", english: "Connecting to Jiguli…"))
                         .appFont(.headline)
-                    Text("正在为项目准备首次会话，完成后即可直接发送消息。")
+                    Text(model.localized(
+                        "正在为项目准备首次会话，完成后即可直接发送消息。",
+                        english: "Preparing the first project conversation. You can send messages when it is ready."
+                    ))
                         .appFont(.subheadline)
                         .foregroundStyle(.secondary)
                 }
             } else if let error = model.projectConversationPreparationError(projectID: projectID) {
                 ContentUnavailableView {
-                    Label("会话准备失败", systemImage: "exclamationmark.bubble")
+                    Label(
+                        model.localized("会话准备失败", english: "Conversation setup failed"),
+                        systemImage: "exclamationmark.bubble"
+                    )
                 } description: {
                     Text(error)
                 } actions: {
-                    Button("重试") {
+                    Button(model.localized("重试", english: "Retry")) {
                         model.retryProjectConversationPreparation(projectID: projectID)
                     }
                     .buttonStyle(.borderedProminent)
                 }
             } else {
                 ContentUnavailableView(
-                    "项目还没有可用会话",
+                    model.localized(
+                        "项目还没有可用会话",
+                        english: "No project conversation is available"
+                    ),
                     systemImage: "bubble.left.and.bubble.right",
-                    description: Text("正在等待默认联系人“叽咕狸”可用。")
+                    description: Text(model.localized(
+                        "正在等待默认联系人“叽咕狸”可用。",
+                        english: "Waiting for the default contact Jiguli to become available."
+                    ))
                 )
             }
         }
@@ -55,7 +68,8 @@ struct ContactConversationView: View {
     let contactID: String
 
     var body: some View {
-        let contactName = model.contacts.first(where: { $0.id == contactID })?.title ?? "联系人"
+        let contactName = model.contacts.first(where: { $0.id == contactID })?.title
+            ?? model.localized("联系人", english: "Contact")
 
         Group {
             if let conversation = model.contactConversation {
@@ -66,9 +80,12 @@ struct ContactConversationView: View {
                 )
             } else {
                 ContentUnavailableView(
-                    "还没有公开会话",
+                    model.localized("还没有公开会话", english: "No conversation yet"),
                     systemImage: "bubble.left",
-                    description: Text("发送第一条消息后，会话会显示在这里。")
+                    description: Text(model.localized(
+                        "发送第一条消息后，会话会显示在这里。",
+                        english: "The conversation will appear here after you send the first message."
+                    ))
                 )
             }
         }

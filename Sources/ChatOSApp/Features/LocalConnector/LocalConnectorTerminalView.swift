@@ -2,6 +2,7 @@ import ChatOSCore
 import SwiftUI
 
 struct LocalConnectorTerminalView: View {
+    @EnvironmentObject private var model: AppModel
     @ObservedObject var viewModel: LocalConnectorControlCenterViewModel
     @State private var command = "pwd"
     @State private var selectedWorkspaceID = ""
@@ -91,7 +92,7 @@ struct LocalConnectorTerminalView: View {
                             .lineLimit(2)
                             .textSelection(.enabled)
                         HStack(spacing: 8) {
-                            Text(entry.workspaceAlias ?? entry.cwd ?? "本机")
+                            Text(entry.workspaceAlias ?? entry.cwd ?? model.localized("本机", english: "Local"))
                             Text(entry.startedAt)
                             if let exitCode = entry.exitCode {
                                 Text("exit \(exitCode)")
@@ -101,7 +102,7 @@ struct LocalConnectorTerminalView: View {
                         .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Text(entry.status)
+                    Text(displayHistoryStatus(entry.status))
                         .appFont(.caption.weight(.medium))
                         .foregroundStyle(historyColor(entry.status))
                 }
@@ -121,14 +122,23 @@ struct LocalConnectorTerminalView: View {
 
     private var outputText: String {
         guard let result = viewModel.terminalResult else {
-            return "ChatOS Local Terminal\n命令会经过与任务执行相同的权限与审批链路。"
+            return model.localized(
+                "ChatOS 本机终端\n命令会经过与任务执行相同的权限与审批链路。",
+                english: "ChatOS Local Terminal\nCommands use the same permission and approval flow as task execution."
+            )
         }
         let commandLine = ([result.command] + result.args).joined(separator: " ")
         let output = [result.stdout, result.stderr, result.error]
             .compactMap { $0?.trimmingCharacters(in: .newlines) }
             .filter { !$0.isEmpty }
             .joined(separator: "\n")
-        return "$ \(commandLine)\n\(output.isEmpty ? "（没有输出）" : output)\n\n进程退出：\(result.exitCode.map(String.init) ?? "—")"
+        let displayedOutput = output.isEmpty
+            ? model.localized("（没有输出）", english: "(No output)")
+            : output
+        return model.localized(
+            "$ \(commandLine)\n\(displayedOutput)\n\n进程退出：\(result.exitCode.map(String.init) ?? "—")",
+            english: "$ \(commandLine)\n\(displayedOutput)\n\nProcess exited: \(result.exitCode.map(String.init) ?? "—")"
+        )
     }
 
     private var outputColor: Color {
@@ -157,5 +167,15 @@ struct LocalConnectorTerminalView: View {
     private func historyColor(_ status: String) -> Color {
         status.lowercased().contains("success") || status.lowercased().contains("completed")
             ? .green : .orange
+    }
+
+    private func displayHistoryStatus(_ status: String) -> String {
+        switch status.lowercased() {
+        case "success", "completed", "succeeded": model.localized("已完成", english: "Completed")
+        case "running", "processing": model.localized("执行中", english: "Running")
+        case "failed", "error": model.localized("失败", english: "Failed")
+        case "cancelled", "canceled": model.localized("已取消", english: "Cancelled")
+        default: status
+        }
     }
 }

@@ -18,6 +18,19 @@ struct TerminalCommandResult: Sendable {
     let output: String
     let error: String
     let exitCode: Int32
+    let workingDirectory: String?
+
+    init(
+        output: String,
+        error: String,
+        exitCode: Int32,
+        workingDirectory: String? = nil
+    ) {
+        self.output = output
+        self.error = error
+        self.exitCode = exitCode
+        self.workingDirectory = workingDirectory
+    }
 }
 
 protocol TerminalCommandExecuting: Sendable {

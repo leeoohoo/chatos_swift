@@ -22,28 +22,8 @@ struct RemoteConnectionBasicsSection: View {
     }
 }
 
-struct RemoteConnectionExecutionSection: View {
-    @ObservedObject var viewModel: RemoteConnectionEditorViewModel
-
-    var body: some View {
-        Section {
-            Picker("执行工作区", selection: $viewModel.workspaceID) {
-                if viewModel.workspaces.isEmpty {
-                    Text("没有可用工作区").tag("")
-                }
-                ForEach(viewModel.workspaces) { workspace in
-                    Text("\(workspace.alias) — \(workspace.absoluteRoot)").tag(workspace.id)
-                }
-            }
-        } header: {
-            Text("本机执行目标")
-        } footer: {
-            Text("SSH、Terminal 和 SFTP 会由这个本机网关工作区执行。")
-        }
-    }
-}
-
 struct RemoteConnectionAuthenticationSection: View {
+    @EnvironmentObject private var model: AppModel
     @ObservedObject var viewModel: RemoteConnectionEditorViewModel
 
     var body: some View {
@@ -57,23 +37,23 @@ struct RemoteConnectionAuthenticationSection: View {
             if viewModel.authenticationType == .password {
                 SecureField(
                     viewModel.editingConnection?.hasPassword == true
-                        ? "留空则继续使用已保存密码"
-                        : "登录密码",
+                        ? model.localized("留空则继续使用已保存密码", english: "Leave blank to keep the saved password")
+                        : model.localized("登录密码", english: "Login Password"),
                     text: $viewModel.password
                 )
             } else {
                 filePathRow(
-                    title: "私钥路径",
+                    title: model.localized("私钥路径", english: "Private Key Path"),
                     placeholder: viewModel.editingConnection?.hasPrivateKeyPath == true
-                        ? "留空则继续使用已保存私钥"
+                        ? model.localized("留空则继续使用已保存私钥", english: "Leave blank to keep the saved private key")
                         : "/Users/you/.ssh/id_ed25519",
                     text: $viewModel.privateKeyPath
                 )
                 if viewModel.authenticationType == .privateKeyCertificate {
                     filePathRow(
-                        title: "证书路径",
+                        title: model.localized("证书路径", english: "Certificate Path"),
                         placeholder: viewModel.editingConnection?.hasCertificatePath == true
-                            ? "留空则继续使用已保存证书"
+                            ? model.localized("留空则继续使用已保存证书", english: "Leave blank to keep the saved certificate")
                             : "/Users/you/.ssh/id_ed25519-cert.pub",
                         text: $viewModel.certificatePath
                     )
@@ -98,6 +78,7 @@ struct RemoteConnectionAuthenticationSection: View {
 }
 
 struct RemoteConnectionJumpSection: View {
+    @EnvironmentObject private var model: AppModel
     @ObservedObject var viewModel: RemoteConnectionEditorViewModel
 
     var body: some View {
@@ -105,7 +86,9 @@ struct RemoteConnectionJumpSection: View {
             Toggle("通过跳板机连接", isOn: $viewModel.jumpEnabled)
             if viewModel.jumpEnabled {
                 Picker("跳板机来源", selection: $viewModel.jumpMode) {
-                    ForEach(RemoteJumpMode.allCases) { mode in Text(mode.rawValue).tag(mode) }
+                    ForEach(RemoteJumpMode.allCases) { mode in
+                        Text(mode.title(language: model.interfaceLanguage)).tag(mode)
+                    }
                 }
                 .pickerStyle(.segmented)
 
@@ -123,8 +106,14 @@ struct RemoteConnectionJumpSection: View {
                         TextField("端口", text: $viewModel.jumpPort).frame(width: 90)
                     }
                     TextField("跳板机用户名", text: $viewModel.jumpUsername)
-                    jumpFileRow("跳板机私钥", text: $viewModel.jumpPrivateKeyPath)
-                    jumpFileRow("跳板机证书（可选）", text: $viewModel.jumpCertificatePath)
+                    jumpFileRow(
+                        model.localized("跳板机私钥", english: "Jump Host Private Key"),
+                        text: $viewModel.jumpPrivateKeyPath
+                    )
+                    jumpFileRow(
+                        model.localized("跳板机证书（可选）", english: "Jump Host Certificate (Optional)"),
+                        text: $viewModel.jumpCertificatePath
+                    )
                     SecureField("跳板机密码（可选）", text: $viewModel.jumpPassword)
                 }
             }

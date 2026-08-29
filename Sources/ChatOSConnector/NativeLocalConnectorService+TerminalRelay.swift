@@ -130,11 +130,40 @@ extension NativeLocalConnectorService {
         cwd: URL,
         projectRoot: URL,
         source: String,
-        risk: NativeApprovalRisk
+        risk: NativeApprovalRisk,
+        requestedPermissionsDescription: String? = nil,
+        approvalScopeKey: String? = nil
     ) async -> NativeApprovalDecision {
+        if let approvalScopeKey, sessionApprovalAllowlist.contains(approvalScopeKey) {
+            let reason = "用户已允许当前本机会话执行此类操作。"
+            publishApprovalEvent(.init(
+                requestID: requestID,
+                command: ([command] + arguments).joined(separator: " "),
+                cwd: cwd.path,
+                source: source,
+                risk: risk.level,
+                decision: "approved",
+                reason: reason,
+                mode: state.approvalMode,
+                reviewer: .session
+            ))
+            return .approve(reason: reason, rememberAllow: true)
+        }
         switch state.approvalMode {
         case .fullControl:
-            return .approve(reason: "用户已启用完全控制模式。", rememberAllow: false)
+            let reason = "当前策略无需逐次审批。"
+            publishApprovalEvent(.init(
+                requestID: requestID,
+                command: ([command] + arguments).joined(separator: " "),
+                cwd: cwd.path,
+                source: source,
+                risk: risk.level,
+                decision: "approved",
+                reason: reason,
+                mode: .fullControl,
+                reviewer: .policy
+            ))
+            return .approve(reason: reason, rememberAllow: false)
         case .requestApproval:
             return await requestUserApproval(
                 requestID: requestID,
@@ -143,7 +172,8 @@ extension NativeLocalConnectorService {
                 cwd: cwd,
                 source: source,
                 risk: risk,
-                reason: risk.reason
+                reason: risk.reason,
+                approvalScopeKey: approvalScopeKey
             )
         case .autoApproval:
             guard let modelID = state.commandApprovalModelConfigID else {
@@ -154,7 +184,8 @@ extension NativeLocalConnectorService {
                     cwd: cwd,
                     source: source,
                     risk: risk,
-                    reason: "本机审批 Agent 尚未配置模型。"
+                    reason: "本机审批 Agent 尚未配置模型。",
+                    approvalScopeKey: approvalScopeKey
                 )
             }
             do {
@@ -170,7 +201,7 @@ extension NativeLocalConnectorService {
                         projectRoot: projectRoot,
                         riskLevel: risk.level,
                         riskReason: risk.reason,
-                        requestedPermissionsDescription: nil
+                        requestedPermissionsDescription: requestedPermissionsDescription
                     ),
                     model: try await model,
                     thinkingLevel: state.commandApprovalThinkingLevel,
@@ -184,8 +215,40 @@ extension NativeLocalConnectorService {
                         cwd: cwd,
                         source: source,
                         risk: risk,
-                        reason: reason
+                        reason: reason,
+                        approvalScopeKey: approvalScopeKey
                     )
+                }
+                if case .approve(_, true) = decision, let approvalScopeKey {
+                    sessionApprovalAllowlist.insert(approvalScopeKey)
+                }
+                switch decision {
+                case let .approve(reason, _):
+                    publishApprovalEvent(.init(
+                        requestID: requestID,
+                        command: ([command] + arguments).joined(separator: " "),
+                        cwd: cwd.path,
+                        source: source,
+                        risk: risk.level,
+                        decision: "approved",
+                        reason: reason,
+                        mode: .autoApproval,
+                        reviewer: .ai
+                    ))
+                case let .deny(reason):
+                    publishApprovalEvent(.init(
+                        requestID: requestID,
+                        command: ([command] + arguments).joined(separator: " "),
+                        cwd: cwd.path,
+                        source: source,
+                        risk: risk.level,
+                        decision: "denied",
+                        reason: reason,
+                        mode: .autoApproval,
+                        reviewer: .ai
+                    ))
+                case .askUser:
+                    break
                 }
                 return decision
             } catch {
@@ -196,7 +259,8 @@ extension NativeLocalConnectorService {
                     cwd: cwd,
                     source: source,
                     risk: risk,
-                    reason: "本机审批 Agent 不可用：\(error.localizedDescription)"
+                    reason: "本机审批 Agent 不可用：\(error.localizedDescription)",
+                    approvalScopeKey: approvalScopeKey
                 )
             }
         }
@@ -209,7 +273,8 @@ extension NativeLocalConnectorService {
         cwd: URL,
         source: String,
         risk: NativeApprovalRisk,
-        reason: String?
+        reason: String?,
+        approvalScopeKey: String?
     ) async -> NativeApprovalDecision {
         let id = UUID().uuidString
         pendingApprovals.append(.init(
@@ -223,6 +288,10 @@ extension NativeLocalConnectorService {
             createdAt: ISO8601DateFormatter().string(from: Date()),
             availableDecisions: ["accept", "acceptForSession", "decline"]
         ))
+        publishApprovalSnapshot()
+        if let approvalScopeKey {
+            pendingApprovalScopeKeys[id] = approvalScopeKey
+        }
         return await withCheckedContinuation { continuation in
             pendingApprovalContinuations[id] = continuation
         }

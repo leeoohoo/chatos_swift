@@ -8,9 +8,11 @@ struct ChatOSApp: App {
         WindowGroup("ChatOS") {
             RootView()
                 .environmentObject(model)
+                .environment(\.locale, model.interfaceLocale)
                 .environment(\.interfaceFontScale, model.interfaceFontScale)
-                .font(.system(size: model.interfaceFontSize))
+                .dynamicTypeSize(model.interfaceDynamicTypeSize)
                 .frame(minWidth: 1_100, minHeight: 720)
+                .task { model.startPetOverlayIfNeeded() }
         }
         .defaultSize(width: 1_440, height: 900)
         .windowStyle(.titleBar)
@@ -18,8 +20,9 @@ struct ChatOSApp: App {
         Settings {
             SettingsView()
                 .environmentObject(model)
+                .environment(\.locale, model.interfaceLocale)
                 .environment(\.interfaceFontScale, model.interfaceFontScale)
-                .font(.system(size: model.interfaceFontSize))
+                .dynamicTypeSize(model.interfaceDynamicTypeSize)
                 .frame(minWidth: 1_050, minHeight: 700)
         }
     }

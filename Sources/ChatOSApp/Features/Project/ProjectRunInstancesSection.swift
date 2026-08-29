@@ -2,6 +2,7 @@ import ChatOSCore
 import SwiftUI
 
 struct ProjectRunInstancesSection: View {
+    @EnvironmentObject private var model: AppModel
     @ObservedObject var viewModel: ProjectRunSettingsViewModel
     @State private var expandedInstanceIDs: Set<String> = []
 
@@ -88,7 +89,9 @@ struct ProjectRunInstancesSection: View {
                     Image(systemName: "chevron.right")
                         .appFont(.caption.weight(.semibold))
                         .rotationEffect(.degrees(isExpanded.wrappedValue ? 90 : 0))
-                    Text(isExpanded.wrappedValue ? "收起运行日志" : "展开运行日志")
+                    Text(isExpanded.wrappedValue
+                         ? model.localized("收起运行日志", english: "Collapse Run Log")
+                         : model.localized("展开运行日志", english: "Expand Run Log"))
                         .appFont(.subheadline.weight(.medium))
                     Spacer()
                 }
@@ -104,7 +107,7 @@ struct ProjectRunInstancesSection: View {
                             .foregroundStyle(.secondary)
                         Spacer()
                         if let exitCode = instance.exitCode {
-                            Text("退出码 \(exitCode)")
+                            Text(model.localized("退出码 \(exitCode)", english: "Exit Code \(exitCode)"))
                                 .appFont(.caption.monospacedDigit())
                                 .foregroundStyle(exitCode == 0 ? Color.secondary : Color.red)
                         } else if instance.isRunning {
@@ -115,7 +118,12 @@ struct ProjectRunInstancesSection: View {
                     }
 
                     CodePreviewView(
-                        content: instance.log?.isEmpty == false ? instance.log! : "进程已经启动，暂时还没有日志输出。",
+                        content: instance.log?.isEmpty == false
+                            ? instance.log!
+                            : model.localized(
+                                "进程已经启动，暂时还没有日志输出。",
+                                english: "The process has started, but no log output is available yet."
+                            ),
                         fileName: "run.log",
                         followsTail: instance.isRunning
                     )
@@ -133,12 +141,12 @@ struct ProjectRunInstancesSection: View {
 
     private func localizedRunStatus(_ status: String) -> String {
         switch status.lowercased() {
-        case "running": "运行中"
-        case "starting": "启动中"
-        case "stopping": "正在停止"
-        case "stopped", "exited": "已结束"
-        case "error", "failed": "运行失败"
-        case "idle": "空闲"
+        case "running": model.localized("运行中", english: "Running")
+        case "starting": model.localized("启动中", english: "Starting")
+        case "stopping": model.localized("正在停止", english: "Stopping")
+        case "stopped", "exited": model.localized("已结束", english: "Ended")
+        case "error", "failed": model.localized("运行失败", english: "Run Failed")
+        case "idle": model.localized("空闲", english: "Idle")
         default: status
         }
     }

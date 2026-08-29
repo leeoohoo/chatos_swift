@@ -2,20 +2,27 @@ import ChatOSCore
 import SwiftUI
 
 struct LocalConnectorTaskModelsSection: View {
+    @EnvironmentObject private var appModel: AppModel
     var models: [LocalConnectorModelConfig]
     @Binding var drafts: [String: LocalConnectorTaskModelDraft]
 
     var body: some View {
         LocalConnectorCard(
-            "Task Runner 模型",
-            subtitle: "每个模型分别配置任务用途、默认 Thinking、Temperature 与最大输出长度。",
+            appModel.localized("Task Runner 模型", english: "Task Runner Models"),
+            subtitle: appModel.localized(
+                "每个模型分别配置任务用途、默认 Thinking、Temperature 与最大输出长度。",
+                english: "Configure task usage, default thinking, temperature, and maximum output for each model."
+            ),
             systemImage: "point.3.connected.trianglepath.dotted"
         ) {
             if models.isEmpty {
                 ContentUnavailableView(
-                    "还没有模型",
+                    appModel.localized("还没有模型", english: "No models yet"),
                     systemImage: "brain.head.profile",
-                    description: Text("请先添加供应商并刷新模型目录。")
+                    description: Text(appModel.localized(
+                        "请先添加供应商并刷新模型目录。",
+                        english: "Add a provider and refresh the model catalog first."
+                    ))
                 )
                 .frame(minHeight: 150)
             } else {
@@ -40,6 +47,7 @@ struct LocalConnectorTaskModelsSection: View {
 }
 
 private struct LocalConnectorTaskModelRow: View {
+    @EnvironmentObject private var appModel: AppModel
     var model: LocalConnectorModelConfig
     @Binding var draft: LocalConnectorTaskModelDraft
 
@@ -59,24 +67,30 @@ private struct LocalConnectorTaskModelRow: View {
                 }
                 Spacer()
                 if !model.hasAPIKey {
-                    Label("缺少凭据", systemImage: "key.slash")
+                    Label(appModel.localized("缺少凭据", english: "Missing credentials"), systemImage: "key.slash")
                         .appFont(.caption)
                         .foregroundStyle(.orange)
                 }
-                Toggle("启用", isOn: $draft.enabled)
+                Toggle(appModel.localized("启用", english: "Enabled"), isOn: $draft.enabled)
                     .toggleStyle(.switch)
                     .controlSize(.small)
             }
 
             Grid(horizontalSpacing: 12, verticalSpacing: 5) {
                 GridRow {
-                    fieldTitle("任务用途")
-                    fieldTitle("默认 Thinking")
+                    fieldTitle(appModel.localized("任务用途", english: "Task Usage"))
+                    fieldTitle(appModel.localized("默认 Thinking", english: "Default Thinking"))
                     fieldTitle("Temperature")
                     fieldTitle("Max Tokens")
                 }
                 GridRow {
-                    TextField("例如：代码实现、分析、视觉理解", text: $draft.usage)
+                    TextField(
+                        appModel.localized(
+                            "例如：代码实现、分析、视觉理解",
+                            english: "For example: coding, analysis, visual understanding"
+                        ),
+                        text: $draft.usage
+                    )
                         .frame(minWidth: 220)
                     Picker("Thinking", selection: $draft.thinking) {
                         ForEach(LocalConnectorThinkingOptions.options(provider: model.provider)) { option in
@@ -85,9 +99,9 @@ private struct LocalConnectorTaskModelRow: View {
                     }
                     .labelsHidden()
                     .frame(width: 150)
-                    TextField("默认", text: $draft.temperature)
+                    TextField(appModel.localized("默认", english: "Default"), text: $draft.temperature)
                         .frame(width: 100)
-                    TextField("默认", text: $draft.maxOutputTokens)
+                    TextField(appModel.localized("默认", english: "Default"), text: $draft.maxOutputTokens)
                         .frame(width: 110)
                 }
             }

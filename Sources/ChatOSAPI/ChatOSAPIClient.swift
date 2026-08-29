@@ -66,13 +66,14 @@ public actor ChatOSAPIClient {
             throw ChatOSAPIError.invalidEndpoint
         }
 
+        let requestAccessToken = accessToken
         var headers = [
             "Accept": "application/json",
             "Content-Type": "application/json",
             "X-Chatos-Client-Surface": configuration.clientSurface,
         ]
-        if let accessToken {
-            headers["Authorization"] = "Bearer \(accessToken)"
+        if let requestAccessToken {
+            headers["Authorization"] = "Bearer \(requestAccessToken)"
         }
         additionalHeaders.forEach { headers[$0] = $1 }
 
@@ -84,8 +85,14 @@ public actor ChatOSAPIClient {
             try await credentialStore?.saveAccessToken(refreshedToken)
         }
         if response.statusCode == 401 {
-            accessToken = nil
-            try? await credentialStore?.deleteAccessToken()
+            if let requestAccessToken, accessToken == requestAccessToken {
+                accessToken = nil
+                try? await credentialStore?.deleteAccessToken()
+                NotificationCenter.default.post(
+                    name: .chatOSAuthenticationDidExpire,
+                    object: nil
+                )
+            }
             throw ChatOSAPIError.unauthorized
         }
         guard (200..<300).contains(response.statusCode) else {

@@ -9,7 +9,7 @@ struct ResourceSidebar: View {
         List(selection: $model.selection) {
             Section {
                 if model.isWorkspaceLoading && model.contacts.isEmpty {
-                    loadingRow("正在加载联系人…")
+                    loadingRow(model.localized("正在加载联系人…", english: "Loading contacts…"))
                 }
                 ForEach(model.contacts) { contact in
                     resourceRow(
@@ -21,12 +21,12 @@ struct ResourceSidebar: View {
                     .tag(SidebarSelection.contact(contact.id))
                 }
             } header: {
-                sectionHeader("联系人")
+                sectionHeader(model.localized("联系人", english: "Contacts"))
             }
 
             Section {
                 if model.isWorkspaceLoading && model.projects.isEmpty {
-                    loadingRow("正在加载项目…")
+                    loadingRow(model.localized("正在加载项目…", english: "Loading projects…"))
                 }
                 ForEach(model.projects) { project in
                     resourceRow(
@@ -38,7 +38,7 @@ struct ResourceSidebar: View {
                     .tag(SidebarSelection.project(project.id))
                 }
             } header: {
-                sectionHeader("项目")
+                sectionHeader(model.localized("项目", english: "Projects"))
             }
 
             Section {
@@ -52,17 +52,20 @@ struct ResourceSidebar: View {
                     .tag(SidebarSelection.terminal(terminal.id))
                 }
             } header: {
-                sectionHeader("本机")
+                sectionHeader(model.localized("本机", english: "Local"))
             }
 
             Section {
                 if model.isRemoteConnectionsLoading && model.remoteConnections.isEmpty {
-                    loadingRow("正在加载远端连接…")
+                    loadingRow(model.localized(
+                        "正在加载远端连接…",
+                        english: "Loading remote connections…"
+                    ))
                 } else if model.remoteConnections.isEmpty {
                     HStack(spacing: 10) {
                         Image(systemName: "network")
                             .frame(width: 18)
-                        Text("还没有远端连接")
+                        Text(model.localized("还没有远端连接", english: "No remote connections"))
                             .appFont(.body)
                     }
                     .foregroundStyle(.secondary)
@@ -77,23 +80,33 @@ struct ResourceSidebar: View {
                         )
                         .tag(SidebarSelection.remote(connection.id))
                         .contextMenu {
-                            Button("编辑", systemImage: "pencil") {
+                            Button(model.localized("编辑", english: "Edit"), systemImage: "pencil") {
                                 creationSheet = .editRemoteConnection(connection.id)
                             }
                         }
                     }
                 }
             } header: {
-                sectionHeader("远端")
+                sectionHeader(model.localized("远端", english: "Remote"))
             }
 
             if let remoteError = model.remoteConnectionsError {
                 Section {
                     VStack(alignment: .leading, spacing: 7) {
-                        Label("远端连接加载失败", systemImage: "exclamationmark.triangle.fill")
+                        Label(
+                            model.localized(
+                                "远端连接加载失败",
+                                english: "Failed to load remote connections"
+                            ),
+                            systemImage: "exclamationmark.triangle.fill"
+                        )
                             .foregroundStyle(.orange)
                         Text(remoteError).appFont(.caption2).foregroundStyle(.secondary)
-                        Button("重试", action: model.refreshRemoteConnections).controlSize(.small)
+                        Button(
+                            model.localized("重试", english: "Retry"),
+                            action: model.refreshRemoteConnections
+                        )
+                        .controlSize(.small)
                     }
                     .padding(.vertical, 4)
                 }
@@ -102,12 +115,15 @@ struct ResourceSidebar: View {
             if let workspaceError = model.workspaceError {
                 Section {
                     VStack(alignment: .leading, spacing: 7) {
-                        Label("资源同步失败", systemImage: "exclamationmark.triangle.fill")
+                        Label(
+                            model.localized("资源同步失败", english: "Resource sync failed"),
+                            systemImage: "exclamationmark.triangle.fill"
+                        )
                             .foregroundStyle(.orange)
                         Text(workspaceError)
                             .appFont(.caption2)
                             .foregroundStyle(.secondary)
-                        Button("重试", action: model.refreshWorkspace)
+                        Button(model.localized("重试", english: "Retry"), action: model.refreshWorkspace)
                             .controlSize(.small)
                     }
                     .padding(.vertical, 4)
@@ -118,23 +134,30 @@ struct ResourceSidebar: View {
         .navigationTitle("ChatOS")
         .toolbar {
             ToolbarItem(placement: .automatic) {
-                Button("刷新资源", systemImage: "arrow.clockwise", action: model.refreshAllResources)
+                Button(
+                    model.localized("刷新资源", english: "Refresh Resources"),
+                    systemImage: "arrow.clockwise",
+                    action: model.refreshAllResources
+                )
                     .labelStyle(.iconOnly)
                     .disabled(model.isWorkspaceLoading)
             }
             ToolbarItem(placement: .primaryAction) {
                 Menu {
-                    Button("新建项目", systemImage: "folder.badge.plus") {
+                    Button(model.localized("新建项目", english: "New Project"), systemImage: "folder.badge.plus") {
                         creationSheet = .project
                     }
                     Divider()
-                    Button("新建远端连接", systemImage: "network.badge.shield.half.filled") {
+                    Button(
+                        model.localized("新建远端连接", english: "New Remote Connection"),
+                        systemImage: "network.badge.shield.half.filled"
+                    ) {
                         creationSheet = .createRemoteConnection
                     }
                 } label: {
                     Image(systemName: "plus")
                 }
-                .help("新建资源")
+                .help(model.localized("新建资源", english: "New Resource"))
             }
         }
         .sheet(item: $creationSheet) { sheet in
@@ -151,7 +174,6 @@ struct ResourceSidebar: View {
                 RemoteConnectionEditorSheetHost(
                     editingConnection: nil,
                     connections: model.remoteConnections,
-                    connectorStatus: model.localConnectorControl.status,
                     service: model.remoteConnectionService,
                     onSaved: model.registerRemoteConnection
                 )
@@ -159,7 +181,6 @@ struct ResourceSidebar: View {
                 RemoteConnectionEditorSheetHost(
                     editingConnection: model.remoteConnection(id: id),
                     connections: model.remoteConnections,
-                    connectorStatus: model.localConnectorControl.status,
                     service: model.remoteConnectionService,
                     onSaved: model.registerRemoteConnection
                 )

@@ -115,6 +115,23 @@ final class ConversationHistoryMapperTests: XCTestCase {
         XCTAssertEqual(replies[2].taskCallback?.event, "task.completed")
     }
 
+    func testTerminalCallbackEventOverridesStaleRunningStatus() throws {
+        let response = try JSONDecoder().decode(
+            CompactHistoryResponseDTO.self,
+            from: Data(#"{"items":[{"id":"user-1","conversation_id":"conversation-1","role":"user","content":"执行任务","metadata":{"conversation_turn_id":"turn-1"}},{"id":"callback-1","conversation_id":"conversation-1","role":"assistant","content":"任务已完成","message_mode":"task_runner_callback","metadata":{"task_runner_async":{"message_kind":"task_terminal_update","event":"task.completed","status":"running","task_id":"task-1","source_turn_id":"turn-1","source_user_message_id":"user-1"}}}],"has_more":false}"#.utf8)
+        )
+
+        let page = ConversationHistoryMapper.map(
+            response,
+            sessionID: "conversation-1",
+            requestGeneration: 1
+        )
+
+        let callback = try XCTUnwrap(page.turns.first?.assistantReplies.first?.taskCallback)
+        XCTAssertEqual(callback.event, "task.completed")
+        XCTAssertEqual(callback.status, "completed")
+    }
+
     func testUserMessageMapsPersistedAttachments() throws {
         let response = try JSONDecoder().decode(
             CompactHistoryResponseDTO.self,

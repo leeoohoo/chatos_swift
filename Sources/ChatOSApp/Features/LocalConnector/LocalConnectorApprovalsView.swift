@@ -2,17 +2,15 @@ import ChatOSCore
 import SwiftUI
 
 struct LocalConnectorApprovalsView: View {
+    @EnvironmentObject private var model: AppModel
     @ObservedObject var viewModel: LocalConnectorControlCenterViewModel
     @State private var proposedElevatedMode: LocalConnectorApprovalMode?
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                policyCard
-                pendingCard
-                historyCard
-            }
-            .padding(24)
+        SettingsGroupedPage {
+            policyCard
+            pendingCard
+            historyCard
         }
         .confirmationDialog(
             approvalConfirmationTitle,
@@ -28,7 +26,7 @@ struct LocalConnectorApprovalsView: View {
                     viewModel.updateApprovalMode(mode, riskAcknowledged: true)
                 }
             }
-            Button("取消", role: .cancel) {
+            Button(model.localized("取消", english: "Cancel"), role: .cancel) {
                 proposedElevatedMode = nil
             }
         } message: {
@@ -38,12 +36,15 @@ struct LocalConnectorApprovalsView: View {
 
     private var policyCard: some View {
         LocalConnectorCard(
-            "默认审批级别",
-            subtitle: "项目没有单独策略时使用这里的默认值",
+            model.localized("默认审批级别", english: "Default Approval Level"),
+            subtitle: model.localized(
+                "项目没有单独策略时使用这里的默认值",
+                english: "Projects use this default unless they define their own policy"
+            ),
             systemImage: "checkmark.shield"
         ) {
             Picker(
-                "审批模式",
+                model.localized("审批模式", english: "Approval mode"),
                 selection: Binding(
                     get: { viewModel.approvalSettings?.defaultMode ?? .requestApproval },
                     set: { mode in
@@ -55,9 +56,9 @@ struct LocalConnectorApprovalsView: View {
                     }
                 )
             ) {
-                Text("需要确认").tag(LocalConnectorApprovalMode.requestApproval)
-                Text("自动审批").tag(LocalConnectorApprovalMode.autoApproval)
-                Text("完全控制").tag(LocalConnectorApprovalMode.fullControl)
+                Text(model.localized("需要确认", english: "Ask Every Time")).tag(LocalConnectorApprovalMode.requestApproval)
+                Text(model.localized("自动审批", english: "Automatic")).tag(LocalConnectorApprovalMode.autoApproval)
+                Text(model.localized("完全控制", english: "Full Control")).tag(LocalConnectorApprovalMode.fullControl)
             }
             .pickerStyle(.segmented)
             Text(approvalModeDescription)
@@ -68,12 +69,15 @@ struct LocalConnectorApprovalsView: View {
 
     private var pendingCard: some View {
         LocalConnectorCard(
-            "等待处理",
-            subtitle: "任务会停在这里，直到用户或审批模型作出决定",
+            model.localized("等待处理", english: "Pending"),
+            subtitle: model.localized(
+                "任务会停在这里，直到用户或审批模型作出决定",
+                english: "Tasks pause here until the user or approval model decides"
+            ),
             systemImage: "hourglass"
         ) {
             if viewModel.pendingApprovals.isEmpty {
-                Label("当前没有等待审批的操作", systemImage: "checkmark.circle")
+                Label(model.localized("当前没有等待审批的操作", english: "No operations are waiting for approval"), systemImage: "checkmark.circle")
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 70)
             } else {
@@ -117,14 +121,14 @@ struct LocalConnectorApprovalsView: View {
                     .foregroundStyle(.secondary)
             }
             HStack {
-                Button("拒绝", role: .destructive) {
+                Button(model.localized("拒绝", english: "Decline"), role: .destructive) {
                     viewModel.resolveApproval(id: approval.id, decision: "decline")
                 }
                 Spacer()
-                Button("仅本次允许") {
+                Button(model.localized("仅本次允许", english: "Allow Once")) {
                     viewModel.resolveApproval(id: approval.id, decision: "accept")
                 }
-                Button("本会话允许") {
+                Button(model.localized("本会话允许", english: "Allow for Session")) {
                     viewModel.resolveApproval(id: approval.id, decision: "acceptForSession")
                 }
                 .buttonStyle(.borderedProminent)
@@ -135,13 +139,16 @@ struct LocalConnectorApprovalsView: View {
 
     private var historyCard: some View {
         LocalConnectorCard(
-            "审批记录",
-            subtitle: "最近的命令和 Computer Use 决策审计",
+            model.localized("审批记录", english: "Approval History"),
+            subtitle: model.localized(
+                "最近的命令和 Computer Use 决策审计",
+                english: "Recent command and Computer Use decision audit"
+            ),
             systemImage: "clock.arrow.circlepath"
         ) {
             let history = Array((viewModel.approvalSettings?.history ?? []).prefix(30))
             if history.isEmpty {
-                Text("还没有审批记录。")
+                Text(model.localized("还没有审批记录。", english: "No approval history yet."))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 60)
             } else {
@@ -174,36 +181,57 @@ struct LocalConnectorApprovalsView: View {
 
     private var approvalModeDescription: String {
         switch viewModel.approvalSettings?.defaultMode ?? .requestApproval {
-        case .requestApproval: "敏感操作逐条确认；这是默认推荐策略。"
-        case .autoApproval: "由审批模型根据操作风险自动决定，无法判断时仍会询问用户。"
-        case .fullControl: "允许任务直接执行高风险操作，只适合完全受信任的环境。"
+        case .requestApproval:
+            model.localized(
+                "敏感操作逐条确认；这是默认推荐策略。",
+                english: "Confirm each sensitive operation. This is the recommended default."
+            )
+        case .autoApproval:
+            model.localized(
+                "由审批模型根据操作风险自动决定，无法判断时仍会询问用户。",
+                english: "The approval model decides based on risk and asks you when uncertain."
+            )
+        case .fullControl:
+            model.localized(
+                "允许任务直接执行高风险操作，只适合完全受信任的环境。",
+                english: "Tasks may execute high-risk operations directly. Use only in fully trusted environments."
+            )
         }
     }
 
     private var approvalConfirmationTitle: String {
         switch proposedElevatedMode {
-        case .autoApproval: "确认启用自动审批？"
-        case .fullControl: "确认授予完全控制？"
-        default: "确认更改审批模式？"
+        case .autoApproval: model.localized("确认启用自动审批？", english: "Enable automatic approval?")
+        case .fullControl: model.localized("确认授予完全控制？", english: "Grant full control?")
+        default: model.localized("确认更改审批模式？", english: "Change approval mode?")
         }
     }
 
     private var approvalConfirmationMessage: String {
         switch proposedElevatedMode {
         case .autoApproval:
-            "审批模型将自动决定部分敏感操作，无法判断时仍会请求你的确认。"
+            model.localized(
+                "审批模型将自动决定部分敏感操作，无法判断时仍会请求你的确认。",
+                english: "The approval model will decide some sensitive operations automatically and ask you when uncertain."
+            )
         case .fullControl:
-            "任务将可以直接执行高风险操作。请只在完全信任当前设备、项目与任务时使用。"
+            model.localized(
+                "任务将可以直接执行高风险操作。请只在完全信任当前设备、项目与任务时使用。",
+                english: "Tasks will be able to execute high-risk operations directly. Use this only when you fully trust the device, project, and task."
+            )
         default:
-            "此操作会改变本机任务的默认审批策略。"
+            model.localized(
+                "此操作会改变本机任务的默认审批策略。",
+                english: "This changes the default approval policy for local tasks."
+            )
         }
     }
 
     private func approvalConfirmationButton(for mode: LocalConnectorApprovalMode) -> String {
         switch mode {
-        case .autoApproval: "启用自动审批"
-        case .fullControl: "授予完全控制"
-        case .requestApproval: "切换"
+        case .autoApproval: model.localized("启用自动审批", english: "Enable Automatic Approval")
+        case .fullControl: model.localized("授予完全控制", english: "Grant Full Control")
+        case .requestApproval: model.localized("切换", english: "Switch")
         }
     }
 

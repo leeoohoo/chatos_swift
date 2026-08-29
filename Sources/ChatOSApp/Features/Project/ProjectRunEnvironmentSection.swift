@@ -2,6 +2,7 @@ import ChatOSCore
 import SwiftUI
 
 struct ProjectRunEnvironmentSection: View {
+    @EnvironmentObject private var model: AppModel
     @ObservedObject var viewModel: ProjectRunSettingsViewModel
     @State private var isAdvancedExpanded = false
 
@@ -28,7 +29,12 @@ struct ProjectRunEnvironmentSection: View {
                             .appFont(.caption)
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Button(viewModel.isMutating ? "保存中…" : "保存工具选择", systemImage: "square.and.arrow.down") {
+                        Button(
+                            viewModel.isMutating
+                                ? model.localized("保存中…", english: "Saving…")
+                                : model.localized("保存工具选择", english: "Save Tool Selection"),
+                            systemImage: "square.and.arrow.down"
+                        ) {
                             Task { await viewModel.saveEnvironment() }
                         }
                         .disabled(viewModel.isMutating)
@@ -60,18 +66,27 @@ struct ProjectRunEnvironmentSection: View {
     }
 
     private func readinessSummary(_ environment: ProjectRunEnvironment) -> some View {
-        let targetName = viewModel.selectedTarget?.label ?? "当前运行目标"
+        let targetName = viewModel.selectedTarget?.label
+            ?? model.localized("当前运行目标", english: "Current Run Target")
         let ready = environment.validationIssues.isEmpty
         return HStack(alignment: .top, spacing: 12) {
             Image(systemName: ready ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                 .appFont(.title3)
                 .foregroundStyle(ready ? .green : .orange)
             VStack(alignment: .leading, spacing: 4) {
-                Text(ready ? "运行环境已准备好" : "启动前还需要处理环境问题")
+                Text(ready
+                     ? model.localized("运行环境已准备好", english: "Runtime Ready")
+                     : model.localized("启动前还需要处理环境问题", english: "Runtime Issues Need Attention"))
                     .appFont(.subheadline.weight(.semibold))
                 Text(ready
-                     ? "已为“\(targetName)”找到所需的本机工具。通常无需修改下面的自动选择。"
-                     : "系统会在本机启动“\(targetName)”。请先处理上方预检提示中缺少的工具。")
+                     ? model.localized(
+                        "已为“\(targetName)”找到所需的本机工具。通常无需修改下面的自动选择。",
+                        english: "The required local tools were found for “\(targetName)”. You usually do not need to change the automatic selections below."
+                     )
+                     : model.localized(
+                        "系统会在本机启动“\(targetName)”。请先处理上方预检提示中缺少的工具。",
+                        english: "ChatOS will start “\(targetName)” on this Mac. Resolve the missing tools reported by the checks above first."
+                     ))
                     .appFont(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -94,7 +109,9 @@ struct ProjectRunEnvironmentSection: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 7) {
                     Text(toolchainTitle(kind)).appFont(.subheadline.weight(.semibold))
-                    Text(selectedOption == nil ? "未找到" : "已找到")
+                    Text(selectedOption == nil
+                         ? model.localized("未找到", english: "Not Found")
+                         : model.localized("已找到", english: "Found"))
                         .appFont(.caption.weight(.medium))
                         .foregroundStyle(selectedOption == nil ? .red : .green)
                 }
@@ -113,9 +130,18 @@ struct ProjectRunEnvironmentSection: View {
 
             Spacer(minLength: 12)
 
-            Picker("选择 \(toolchainTitle(kind))", selection: toolchainBinding(kind)) {
+            Picker(
+                model.localized(
+                    "选择 \(toolchainTitle(kind))",
+                    english: "Select \(toolchainTitle(kind))"
+                ),
+                selection: toolchainBinding(kind)
+            ) {
                 if let automatic = options.first {
-                    Text("自动 · \(automatic.label)").tag("")
+                    Text(model.localized(
+                        "自动 · \(automatic.label)",
+                        english: "Automatic · \(automatic.label)"
+                    )).tag("")
                 } else {
                     Text("未找到可用程序").tag("")
                 }
@@ -125,7 +151,10 @@ struct ProjectRunEnvironmentSection: View {
                 if let selected = viewModel.selectedToolchains[kind],
                    !selected.isEmpty,
                    !options.contains(where: { $0.id == selected }) {
-                    Text("手动 · \(URL(fileURLWithPath: selected).lastPathComponent)").tag(selected)
+                    Text(model.localized(
+                        "手动 · \(URL(fileURLWithPath: selected).lastPathComponent)",
+                        english: "Manual · \(URL(fileURLWithPath: selected).lastPathComponent)"
+                    )).tag(selected)
                 }
             }
             .labelsHidden()
@@ -170,7 +199,12 @@ struct ProjectRunEnvironmentSection: View {
                     viewModel.addEnvironmentVariable()
                 }
                 Spacer()
-                Button(viewModel.isMutating ? "保存中…" : "保存环境变量", systemImage: "square.and.arrow.down") {
+                Button(
+                    viewModel.isMutating
+                        ? model.localized("保存中…", english: "Saving…")
+                        : model.localized("保存环境变量", english: "Save Environment Variables"),
+                    systemImage: "square.and.arrow.down"
+                ) {
                     Task { await viewModel.saveEnvironment() }
                 }
                 .buttonStyle(.borderedProminent)
@@ -195,7 +229,7 @@ struct ProjectRunEnvironmentSection: View {
                 label: URL(fileURLWithPath: selected).lastPathComponent,
                 version: nil,
                 path: selected,
-                source: "手动选择",
+                source: model.localized("手动选择", english: "Manual Selection"),
                 isDefault: false
             )
     }
@@ -228,16 +262,26 @@ struct ProjectRunEnvironmentSection: View {
 
     private func toolchainDescription(_ kind: String) -> String {
         switch kind.lowercased() {
-        case "java", "java_home": "编译并启动 Java 应用"
-        case "mvn": "读取 pom.xml、解析依赖并执行 Spring Boot"
-        case "gradle": "读取 Gradle 构建配置并启动应用"
-        case "node": "运行 JavaScript / TypeScript 代码"
-        case "npm", "pnpm", "yarn": "安装依赖并执行 package.json 中的脚本"
-        case "python": "运行 Python 程序和测试"
-        case "cargo": "编译并运行 Rust 项目"
-        case "go": "编译并运行 Go 项目"
-        case "swift": "编译并运行 Swift Package"
-        default: "当前运行目标需要使用的本机程序"
+        case "java", "java_home":
+            model.localized("编译并启动 Java 应用", english: "Compile and start Java applications")
+        case "mvn":
+            model.localized("读取 pom.xml、解析依赖并执行 Spring Boot", english: "Read pom.xml, resolve dependencies, and run Spring Boot")
+        case "gradle":
+            model.localized("读取 Gradle 构建配置并启动应用", english: "Read the Gradle build configuration and start the application")
+        case "node":
+            model.localized("运行 JavaScript / TypeScript 代码", english: "Run JavaScript / TypeScript code")
+        case "npm", "pnpm", "yarn":
+            model.localized("安装依赖并执行 package.json 中的脚本", english: "Install dependencies and run scripts from package.json")
+        case "python":
+            model.localized("运行 Python 程序和测试", english: "Run Python programs and tests")
+        case "cargo":
+            model.localized("编译并运行 Rust 项目", english: "Compile and run Rust projects")
+        case "go":
+            model.localized("编译并运行 Go 项目", english: "Compile and run Go projects")
+        case "swift":
+            model.localized("编译并运行 Swift Package", english: "Compile and run a Swift package")
+        default:
+            model.localized("当前运行目标需要使用的本机程序", english: "Local executable required by the current run target")
         }
     }
 }

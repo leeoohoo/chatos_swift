@@ -105,6 +105,7 @@ public struct RemoteConnectionDraft: Sendable, Equatable {
     public var jumpPrivateKeyPath: String?
     public var jumpCertificatePath: String?
     public var jumpPassword: String?
+    public var localCredentialReferenceID: String?
 
     public init(
         name: String?,
@@ -126,7 +127,8 @@ public struct RemoteConnectionDraft: Sendable, Equatable {
         jumpUsername: String?,
         jumpPrivateKeyPath: String?,
         jumpCertificatePath: String?,
-        jumpPassword: String?
+        jumpPassword: String?,
+        localCredentialReferenceID: String? = nil
     ) {
         self.name = name
         self.host = host
@@ -148,6 +150,7 @@ public struct RemoteConnectionDraft: Sendable, Equatable {
         self.jumpPrivateKeyPath = jumpPrivateKeyPath
         self.jumpCertificatePath = jumpCertificatePath
         self.jumpPassword = jumpPassword
+        self.localCredentialReferenceID = localCredentialReferenceID
     }
 }
 
@@ -159,6 +162,33 @@ public struct RemoteConnectionTestResult: Sendable, Equatable {
         self.success = success
         self.message = message
     }
+}
+
+public struct RemoteTerminalCommandResult: Sendable, Equatable {
+    public var output: String
+    public var error: String
+    public var exitCode: Int32
+    public var workingDirectory: String
+
+    public init(
+        output: String,
+        error: String,
+        exitCode: Int32,
+        workingDirectory: String
+    ) {
+        self.output = output
+        self.error = error
+        self.exitCode = exitCode
+        self.workingDirectory = workingDirectory
+    }
+}
+
+public protocol RemoteTerminalCommandServicing: Sendable {
+    func executeRemoteCommand(
+        connectionID: String,
+        command: String,
+        workingDirectory: String
+    ) async throws -> RemoteTerminalCommandResult
 }
 
 public struct RemoteVerificationChallenge: Error, Sendable, Equatable {

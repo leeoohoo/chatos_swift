@@ -2,6 +2,7 @@ import ChatOSCore
 import SwiftUI
 
 struct RequirementDetailView: View {
+    @EnvironmentObject private var model: AppModel
     @ObservedObject var viewModel: ProjectPlanViewModel
     let onPreviewScope: (ProjectRequirement) -> Void
     let onOpenExecution: (ProjectRequirement) -> Void
@@ -59,7 +60,9 @@ struct RequirementDetailView: View {
 
                 if viewModel.execution != nil {
                     Button(
-                        viewModel.execution?.hasStartedRuns == true ? "查看执行过程" : "查看执行计划",
+                        viewModel.execution?.hasStartedRuns == true
+                            ? model.localized("查看执行过程", english: "View Execution Process")
+                            : model.localized("查看执行计划", english: "View Execution Plan"),
                         systemImage: "eye"
                     ) {
                         onOpenExecution(requirement)
@@ -130,6 +133,7 @@ struct RequirementDetailView: View {
 }
 
 private struct PlanDetailTabBar: View {
+    @EnvironmentObject private var model: AppModel
     @ObservedObject var viewModel: ProjectPlanViewModel
 
     var body: some View {
@@ -152,7 +156,7 @@ private struct PlanDetailTabBar: View {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                Text(section.rawValue)
+                Text(section.title(language: model.interfaceLanguage))
                 if let count {
                     Text("\(count)")
                         .appFont(.caption2.monospacedDigit())

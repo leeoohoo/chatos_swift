@@ -3,6 +3,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ComposerView: View {
+    @EnvironmentObject private var model: AppModel
     @ObservedObject var conversation: ConversationSessionViewModel
     @State private var showsFileImporter = false
     @State private var previewedAttachment: ConversationAttachmentDraft?
@@ -54,32 +55,54 @@ struct ComposerView: View {
 
     private var controls: some View {
         HStack(spacing: 8) {
-            Menu("my / gpt-5.6-terra") {
-                Button("my / gpt-5.6-terra") {}
-                Button("my / gpt-5.6-luna") {}
+            Menu(selectedModelDisplayName) {
+                ForEach(conversation.availableModels) { model in
+                    Button {
+                        conversation.setSelectedModelID(model.id)
+                    } label: {
+                        if conversation.selectedModelID == model.id {
+                            Label(model.displayName, systemImage: "checkmark")
+                        } else {
+                            Text(model.displayName)
+                        }
+                    }
+                }
             }
-            Button("附件", systemImage: "paperclip") {
+            .disabled(conversation.availableModels.isEmpty || conversation.isUpdatingRuntimeSettings)
+            Button(model.localized("附件", english: "Attachments"), systemImage: "paperclip") {
                 showsFileImporter = true
             }
                 .labelStyle(.iconOnly)
-                .help("添加图片、文档或其他文件；也可以直接粘贴或拖入")
-            Menu("外挂程式") {
-                Toggle("Open Computer Use", isOn: .constant(true))
-            }
+                .help(model.localized(
+                    "添加图片、文档或其他文件；也可以直接粘贴或拖入",
+                    english: "Add images, documents, or other files. You can also paste or drag them here."
+                ))
             if conversation.allowsPlanMode {
-                Button("规划 \(conversation.planModeEnabled ? "开" : "关")") {
+                Button(model.localized(
+                    "规划 \(conversation.planModeEnabled ? "开" : "关")",
+                    english: "Plan \(conversation.planModeEnabled ? "On" : "Off")"
+                )) {
                     conversation.setPlanModeEnabled(!conversation.planModeEnabled)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(conversation.planModeEnabled ? AppPalette.ai : AppPalette.idleControl)
                 .help(
                     conversation.planModeEnabled
-                        ? "开启后，AI 会先通过 Task Runner 生成待确认的任务图。"
-                        : "关闭后，AI 可直接创建并执行任务。"
+                        ? model.localized(
+                            "开启后，AI 会先通过 Task Runner 生成待确认的任务图。",
+                            english: "When enabled, AI first creates a task graph for confirmation through Task Runner."
+                        )
+                        : model.localized(
+                            "关闭后，AI 可直接创建并执行任务。",
+                            english: "When disabled, AI can create and execute tasks directly."
+                        )
                 )
                 .disabled(conversation.isUpdatingRuntimeSettings)
             }
-            Button("推理 \(conversation.reasoningEnabled ? "开" : "关")") {
+            Button(model.localized(
+                "推理 \(conversation.reasoningEnabled ? "开" : "关")",
+                english: "Reasoning \(conversation.reasoningEnabled ? "On" : "Off")"
+            )) {
                 conversation.setReasoningEnabled(!conversation.reasoningEnabled)
             }
             .buttonStyle(.borderedProminent)
@@ -88,6 +111,18 @@ struct ComposerView: View {
             Spacer()
         }
         .controlSize(.small)
+    }
+
+    private var selectedModelDisplayName: String {
+        if let selected = conversation.availableModels.first(where: {
+            $0.id == conversation.selectedModelID
+        }) {
+            return selected.displayName
+        }
+        if let first = conversation.availableModels.first {
+            return first.displayName
+        }
+        return model.localized("选择模型", english: "Select Model")
     }
 
     @ViewBuilder
@@ -118,7 +153,7 @@ struct ComposerView: View {
                     .appFont(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("关闭", systemImage: "xmark") {
+                Button(model.localized("关闭", english: "Dismiss"), systemImage: "xmark") {
                     conversation.clearAttachmentError()
                 }
                 .labelStyle(.iconOnly)
@@ -129,20 +164,15 @@ struct ComposerView: View {
 
     private var input: some View {
         HStack(alignment: .bottom, spacing: 10) {
-            ZStack(alignment: .topLeading) {
-                if conversation.draft.isEmpty {
-                    Text("输入消息，或粘贴图片、文档和长文本…")
-                        .foregroundStyle(.tertiary)
-                        .padding(.top, 9)
-                        .allowsHitTesting(false)
-                }
-                ComposerPasteTextEditor(
-                    text: $conversation.draft,
-                    onSubmit: conversation.sendDraft,
-                    onPasteContent: handlePasteContent
-                )
-                .frame(minHeight: 38, maxHeight: 126)
-            }
+            ComposerPasteTextEditor(
+                text: $conversation.draft,
+                placeholder: model.localized(
+                    "输入消息，或粘贴图片、文档和长文本…",
+                    english: "Type a message, or paste images, documents, and long text…"
+                ),
+                onSubmit: conversation.sendDraft,
+                onPasteContent: handlePasteContent
+            )
 
             Button(action: conversation.sendDraft) {
                 Group {
@@ -160,7 +190,7 @@ struct ComposerView: View {
         }
         .padding(.leading, 13)
         .padding(.trailing, 7)
-        .padding(.vertical, 7)
+        .padding(.vertical, 4)
         .background(AppPalette.inputSurface, in: RoundedRectangle(cornerRadius: 11))
         .overlay {
             RoundedRectangle(cornerRadius: 11)

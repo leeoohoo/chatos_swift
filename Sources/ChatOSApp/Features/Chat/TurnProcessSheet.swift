@@ -2,6 +2,7 @@ import ChatOSCore
 import SwiftUI
 
 struct TurnProcessSheet: View {
+    @EnvironmentObject private var model: AppModel
     @StateObject private var viewModel: TurnProcessViewModel
     @Environment(\.dismiss) private var dismiss
 
@@ -42,12 +43,13 @@ struct TurnProcessSheet: View {
             }
         }
         .frame(minWidth: 680, minHeight: 560)
+        .environment(\.locale, model.interfaceLocale)
         .task { viewModel.load() }
     }
 
     private var processTimeline: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 0) {
                 header
                 ForEach(Array(viewModel.nodes.enumerated()), id: \.element.id) { index, node in
                     ProcessNodeRow(

@@ -66,6 +66,92 @@ final class ProjectExecutionConfirmationStateTests: XCTestCase {
         XCTAssertFalse(state.canConfirm)
     }
 
+    func testConfirmedPlanIsRunningBeforeFirstRunRecordAppears() {
+        var confirmed = context()
+        confirmed.overallStatus = "processing"
+        confirmed.confirmationStatus = "confirmed"
+        let state = ProjectExecutionConfirmationState(
+            context: confirmed,
+            graph: graph(tasks: [MessageTask(id: "task-1", title: "分析", status: "ready")]),
+            conversationID: "conversation-1"
+        )
+
+        XCTAssertEqual(state.phase, .running)
+        XCTAssertFalse(state.canConfirm)
+    }
+
+    func testPlannerFailureMetadataWinsOverUnstartedReadyTasks() {
+        var failed = context()
+        failed.overallStatus = "failed"
+        failed.confirmationStatus = "failed"
+        let state = ProjectExecutionConfirmationState(
+            context: failed,
+            graph: graph(tasks: [MessageTask(id: "task-1", title: "分析", status: "ready")]),
+            conversationID: "conversation-1"
+        )
+
+        XCTAssertEqual(state.phase, .failed)
+        XCTAssertFalse(state.canConfirm)
+    }
+
+    func testPartialReadyGraphRemainsPlanningUntilBackendRequestsConfirmation() {
+        var planning = context()
+        planning.overallStatus = "planning"
+        planning.confirmationStatus = "planning"
+        let state = ProjectExecutionConfirmationState(
+            context: planning,
+            graph: graph(tasks: [MessageTask(id: "task-1", title: "分析", status: "ready")]),
+            conversationID: "conversation-1"
+        )
+
+        XCTAssertEqual(state.phase, .planning)
+        XCTAssertFalse(state.canConfirm)
+    }
+
+    func testBlockedGraphOverridesLaggingRunningExecutionMetadata() {
+        var running = context()
+        running.overallStatus = "running"
+        running.confirmationStatus = "confirmed"
+        let state = ProjectExecutionConfirmationState(
+            context: running,
+            graph: graph(tasks: [
+                MessageTask(
+                    id: "task-1",
+                    title: "真实任务",
+                    status: "blocked",
+                    lastRunID: "run-1",
+                    lastRunStatus: "running"
+                ),
+            ]),
+            conversationID: "conversation-1"
+        )
+
+        XCTAssertEqual(state.phase, .blocked)
+        XCTAssertEqual(state.overallStatus, "blocked")
+    }
+
+    func testCancelledTaskStatusOverridesStaleRunningRunStatus() {
+        var running = context()
+        running.overallStatus = "running"
+        running.confirmationStatus = "confirmed"
+        let state = ProjectExecutionConfirmationState(
+            context: running,
+            graph: graph(tasks: [
+                MessageTask(
+                    id: "task-1",
+                    title: "已取消任务",
+                    status: "cancelled",
+                    lastRunID: "run-1",
+                    lastRunStatus: "running"
+                ),
+            ]),
+            conversationID: "conversation-1"
+        )
+
+        XCTAssertEqual(state.phase, .failed)
+        XCTAssertEqual(state.overallStatus, "cancelled")
+    }
+
     private func context() -> ProjectExecutionContext {
         ProjectExecutionContext(
             projectID: "project-1",

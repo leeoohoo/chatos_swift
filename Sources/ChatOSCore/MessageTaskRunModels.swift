@@ -87,6 +87,12 @@ public protocol MessageTaskGraphServicing: Sendable {
         lookup: MessageTaskLookup?,
         instruction: String?
     ) async throws -> MessageTaskRun
+    func cancelTask(
+        messageID: String,
+        taskID: String,
+        lookup: MessageTaskLookup?,
+        reason: String?
+    ) async throws
 }
 
 public extension MessageTaskGraphServicing {

@@ -23,28 +23,28 @@ enum NativeSystemPermissions {
                     id: "accessibility",
                     label: "辅助功能",
                     summary: "允许 Computer Use 控制本机应用",
-                    ready: AXIsProcessTrusted(),
+                    ready: isGranted("accessibility"),
                     canRequest: true,
-                    requestLabel: "请求辅助功能权限",
-                    note: "由 macOS 系统设置控制。"
+                    requestLabel: "授权引导",
+                    note: "授权目标是当前 ChatOS App；引导窗口可直接打开设置或拖入应用列表。"
                 ),
                 permission(
                     id: "screen_recording",
                     label: "屏幕与系统音频录制",
                     summary: "允许 Computer Use 获取屏幕画面",
-                    ready: CGPreflightScreenCaptureAccess(),
+                    ready: isGranted("screen_recording"),
                     canRequest: true,
-                    requestLabel: "请求屏幕录制权限",
-                    note: "首次请求会显示 macOS 授权提示。"
+                    requestLabel: "授权引导",
+                    note: "授权目标是当前 ChatOS App；首次授权后可能需要重启 ChatOS。"
                 ),
                 permission(
                     id: "full_disk_access",
                     label: "完全磁盘访问",
                     summary: "访问受 macOS 隐私保护的目录",
-                    ready: false,
+                    ready: isGranted("full_disk_access"),
                     canRequest: true,
-                    requestLabel: "打开系统设置",
-                    note: "只有需要访问受保护目录时才应开启。"
+                    requestLabel: "授权引导",
+                    note: "需要时可把引导窗口中的 ChatOS App 直接拖入系统设置应用列表。"
                 ),
             ]
         )
@@ -52,16 +52,54 @@ enum NativeSystemPermissions {
 
     @MainActor
     static func request(_ id: String) {
+        NativeSystemPermissionOnboarding.present(permissionID: id)
+    }
+
+    @MainActor
+    static func requestAndOpenSettings(_ id: String) {
         switch id {
         case "accessibility":
             let options = ["AXTrustedCheckOptionPrompt": true]
             AXIsProcessTrustedWithOptions(options as CFDictionary)
+            openPrivacySettings(anchor: "Privacy_Accessibility")
         case "screen_recording":
             CGRequestScreenCaptureAccess()
+            openPrivacySettings(anchor: "Privacy_ScreenCapture")
         case "full_disk_access":
             openPrivacySettings(anchor: "Privacy_AllFiles")
         default:
             break
+        }
+    }
+
+    static func isGranted(_ id: String) -> Bool {
+        switch id {
+        case "accessibility":
+            AXIsProcessTrusted()
+        case "screen_recording":
+            CGPreflightScreenCaptureAccess()
+        case "full_disk_access":
+            hasFullDiskAccess()
+        default:
+            false
+        }
+    }
+
+    static func settingsTitle(_ id: String) -> String {
+        switch id {
+        case "accessibility": "隐私与安全性 > 辅助功能"
+        case "screen_recording": "隐私与安全性 > 屏幕与系统音频录制"
+        case "full_disk_access": "隐私与安全性 > 完全磁盘访问"
+        default: "隐私与安全性"
+        }
+    }
+
+    static func permissionPurpose(_ id: String) -> String {
+        switch id {
+        case "accessibility": "允许 ChatOS 向本机应用发送鼠标、键盘和滚动事件。"
+        case "screen_recording": "允许 ChatOS 获取真实屏幕画面，用于视觉定位和操作验证。"
+        case "full_disk_access": "允许 ChatOS 在你明确要求时访问受 macOS 隐私保护的目录。"
+        default: "允许 ChatOS 使用所选的 macOS 系统能力。"
         }
     }
 
@@ -71,6 +109,14 @@ enum NativeSystemPermissions {
             string: "x-apple.systempreferences:com.apple.preference.security?\(anchor)"
         ) else { return }
         NSWorkspace.shared.open(url)
+    }
+
+    private static func hasFullDiskAccess() -> Bool {
+        let databaseURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/com.apple.TCC/TCC.db")
+        guard let handle = try? FileHandle(forReadingFrom: databaseURL) else { return false }
+        defer { try? handle.close() }
+        return (try? handle.read(upToCount: 1)) != nil
     }
 
     private static func permission(

@@ -17,7 +17,9 @@ extension MessageTaskWorkspaceViewModel {
             do {
                 _ = try await service.confirmExecution(identity)
                 planActionMessage = "已确认执行，任务将按依赖顺序从起始节点运行。"
-                refresh()
+                markExecutionStarted()
+                await refreshWorkspaceState(refreshInspector: true)
+                startPollingIfNeeded(force: true)
             } catch {
                 errorMessage = error.localizedDescription
             }

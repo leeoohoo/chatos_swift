@@ -247,6 +247,16 @@ public actor ChatOSLocalConnectorControlService: LocalConnectorControlServicing 
             body: body
         )
     }
+
+    public func requestPluginPermission(pluginID: String, permissionID: String) async throws {
+        let systemPermissionID: String
+        switch permissionID {
+        case "computer.accessibility": systemPermissionID = "accessibility_control"
+        case "computer.screen-recording": systemPermissionID = "screen_recording"
+        default: return
+        }
+        _ = try await requestSystemPermission(id: systemPermissionID)
+    }
 }
 
 private actor LocalConnectorAPIClient {

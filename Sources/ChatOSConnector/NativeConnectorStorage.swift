@@ -62,7 +62,11 @@ struct NativeConnectorStateStore: Sendable {
 struct NativeConnectorSecretStore: Sendable {
     private let rootURL: URL
 
-    init() {
+    init(rootURL: URL? = nil) {
+        if let rootURL {
+            self.rootURL = rootURL
+            return
+        }
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.homeDirectoryForCurrentUser
         self.rootURL = support

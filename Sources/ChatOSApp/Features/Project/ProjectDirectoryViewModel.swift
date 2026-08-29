@@ -130,6 +130,17 @@ final class ProjectDirectoryViewModel: ObservableObject {
         await selectFile(entry, targetLine: match.line)
     }
 
+    func openGitChange(_ change: ProjectGitChange) async {
+        let entry = ProjectFileEntry(
+            name: URL(fileURLWithPath: change.path).lastPathComponent,
+            path: change.absolutePath,
+            displayPath: change.path,
+            isDirectory: false,
+            isWritable: true
+        )
+        await selectFile(entry)
+    }
+
     func scheduleSearch() {
         searchTask?.cancel()
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)

@@ -3,6 +3,7 @@ import SwiftUI
 
 struct TaskProcessTimelineView: View {
     let items: [TaskProcessTimelineItem]
+    var allowsTextSelection = true
 
     var body: some View {
         if items.isEmpty {
@@ -12,7 +13,7 @@ struct TaskProcessTimelineView: View {
                 description: Text("任务写入关键执行节点后，会按时间顺序展示在这里。")
             )
         } else {
-            LazyVStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 0) {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("执行时间线").appFont(.subheadline.weight(.semibold))
@@ -53,14 +54,14 @@ struct TaskProcessTimelineView: View {
                     if let occurredAt = item.occurredAt {
                         Text(occurredAt)
                             .appFont(.caption2.monospaced())
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(.secondary)
                     }
                 }
                 Text(item.detail)
                     .appFont(.callout)
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-                Text(statusTitle(item.status))
+                    .foregroundStyle(.primary.opacity(0.78))
+                    .appTextSelection(allowsTextSelection)
+                Text(LocalizedStringKey(statusTitle(item.status)))
                     .appFont(.caption2.weight(.medium))
                     .foregroundStyle(statusColor(item.status))
             }

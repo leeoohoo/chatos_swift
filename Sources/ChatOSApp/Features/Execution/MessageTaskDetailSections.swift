@@ -4,18 +4,31 @@ import SwiftUI
 struct MessageTaskDetailSections: View {
     let task: MessageTask
     var isLoadingModelOutput = false
+    var allowsTextSelection = true
 
     var body: some View {
         modelOutputSection
 
         if let summary = distinctResultSummary {
-            TaskDetailTextCard(title: "执行结果摘要", text: summary)
+            TaskDetailTextCard(
+                title: "执行结果摘要",
+                text: summary,
+                allowsTextSelection: allowsTextSelection
+            )
         }
 
         TaskDetailDisclosureSection(title: "任务内容", defaultExpanded: true) {
             VStack(alignment: .leading, spacing: 14) {
-                TaskDetailNamedText(label: "目标", value: task.objective ?? "-")
-                TaskDetailNamedText(label: "描述", value: task.description ?? "-")
+                TaskDetailNamedText(
+                    label: "目标",
+                    value: task.objective ?? "-",
+                    allowsTextSelection: allowsTextSelection
+                )
+                TaskDetailNamedText(
+                    label: "描述",
+                    value: task.description ?? "-",
+                    allowsTextSelection: allowsTextSelection
+                )
             }
         }
 
@@ -31,13 +44,19 @@ struct MessageTaskDetailSections: View {
 
                 if let mcpConfig = task.mcpConfigJSON {
                     TaskDetailSubsection(title: "MCP / 工作区 / 服务器") {
-                        TaskDetailCodeBlock(text: mcpConfig)
+                        TaskDetailCodeBlock(
+                            text: mcpConfig,
+                            allowsTextSelection: allowsTextSelection
+                        )
                     }
                 }
 
                 if let toolState = task.taskToolStateJSON {
                     TaskDetailSubsection(title: "过程产物") {
-                        TaskDetailCodeBlock(text: toolState)
+                        TaskDetailCodeBlock(
+                            text: toolState,
+                            allowsTextSelection: allowsTextSelection
+                        )
                     }
                 }
 
@@ -47,13 +66,19 @@ struct MessageTaskDetailSections: View {
 
                 if let schedule = task.scheduleJSON {
                     TaskDetailSubsection(title: "调度配置") {
-                        TaskDetailCodeBlock(text: schedule)
+                        TaskDetailCodeBlock(
+                            text: schedule,
+                            allowsTextSelection: allowsTextSelection
+                        )
                     }
                 }
 
                 if let input = task.inputPayloadJSON {
                     TaskDetailSubsection(title: "原始输入") {
-                        TaskDetailCodeBlock(text: input)
+                        TaskDetailCodeBlock(
+                            text: input,
+                            allowsTextSelection: allowsTextSelection
+                        )
                     }
                 }
             }
@@ -67,7 +92,10 @@ struct MessageTaskDetailSections: View {
                 .foregroundStyle(AppPalette.ai)
 
             if let output = modelOutput {
-                TaskDetailMarkdownText(text: output)
+                TaskDetailMarkdownText(
+                    text: output,
+                    allowsTextSelection: allowsTextSelection
+                )
             } else if isLoadingModelOutput {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
@@ -111,7 +139,7 @@ struct MessageTaskDetailSections: View {
             }
         }
         .appFont(.callout)
-        .textSelection(.enabled)
+        .appTextSelection(allowsTextSelection)
     }
 
     @ViewBuilder
@@ -137,7 +165,7 @@ struct MessageTaskDetailSections: View {
                         Text(item.id)
                             .appFont(.caption2.monospaced())
                             .foregroundStyle(.tertiary)
-                            .textSelection(.enabled)
+                            .appTextSelection(allowsTextSelection)
                     }
                     .padding(10)
                     .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 9))
@@ -164,7 +192,7 @@ struct MessageTaskDetailSections: View {
             }
         }
         .appFont(.callout)
-        .textSelection(.enabled)
+        .appTextSelection(allowsTextSelection)
     }
 
     private var modelOutput: String? {
@@ -230,11 +258,15 @@ struct MessageTaskDetailSections: View {
 struct TaskDetailTextCard: View {
     let title: String
     let text: String
+    var allowsTextSelection = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title).appFont(.subheadline.weight(.semibold))
-            TaskDetailMarkdownText(text: text)
+            TaskDetailMarkdownText(
+                text: text,
+                allowsTextSelection: allowsTextSelection
+            )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
@@ -244,34 +276,43 @@ struct TaskDetailTextCard: View {
 
 private struct TaskDetailMarkdownText: View {
     let text: String
+    let allowsTextSelection: Bool
 
     var body: some View {
-        MarkdownDocumentView(markdown: text)
+        MarkdownDocumentView(
+            markdown: text,
+            allowsTextSelection: allowsTextSelection
+        )
     }
 }
 
 private struct TaskDetailNamedText: View {
     let label: String
     let value: String
+    let allowsTextSelection: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(label)
                 .appFont(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
-            MarkdownDocumentView(markdown: value)
+            MarkdownDocumentView(
+                markdown: value,
+                allowsTextSelection: allowsTextSelection
+            )
         }
     }
 }
 
 private struct TaskDetailCodeBlock: View {
     let text: String
+    let allowsTextSelection: Bool
 
     var body: some View {
         Text(text)
             .appFont(.caption.monospaced())
             .lineSpacing(2)
-            .textSelection(.enabled)
+            .appTextSelection(allowsTextSelection)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(10)
             .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))

@@ -1,27 +1,28 @@
 import SwiftUI
 
 struct LocalConnectorSandboxView: View {
+    @EnvironmentObject private var model: AppModel
     @ObservedObject var viewModel: LocalConnectorControlCenterViewModel
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                policyCard
-                backendCard
-            }
-            .padding(24)
+        SettingsGroupedPage {
+            policyCard
+            backendCard
         }
     }
 
     private var policyCard: some View {
         LocalConnectorCard(
-            "默认任务权限",
-            subtitle: "新任务在没有项目级覆盖时使用这套策略",
+            model.localized("默认任务权限", english: "Default Task Permissions"),
+            subtitle: model.localized(
+                "新任务在没有项目级覆盖时使用这套策略",
+                english: "New tasks use this policy unless the project overrides it"
+            ),
             systemImage: "lock.shield"
         ) {
             if let settings = viewModel.sandboxSettings {
                 Toggle(
-                    "启用本机权限控制",
+                    model.localized("启用本机权限控制", english: "Enable local access control"),
                     isOn: Binding(
                         get: { settings.enabled },
                         set: { viewModel.updateSandbox(enabled: $0) }
@@ -37,38 +38,44 @@ struct LocalConnectorSandboxView: View {
 
                 Divider()
                 picker(
-                    "文件权限",
+                    model.localized("文件权限", english: "File access"),
                     selection: settings.defaultPermissionProfileID,
                     values: [
-                        ("read_only", "只读"),
-                        ("workspace_write", "工作区可写"),
-                        ("full_access", "完全访问"),
+                        ("read_only", model.localized("只读", english: "Read only")),
+                        ("workspace_write", model.localized("工作区可写", english: "Workspace write")),
+                        ("full_access", model.localized("完全访问", english: "Full access")),
                     ]
                 ) { viewModel.updateSandbox(permissionProfileID: $0) }
                 picker(
-                    "审批策略",
+                    model.localized("审批策略", english: "Approval policy"),
                     selection: settings.defaultApprovalPolicy,
-                    values: [("on_request", "按需审批"), ("never", "不请求审批")]
+                    values: [
+                        ("on_request", model.localized("按需审批", english: "On request")),
+                        ("never", model.localized("不请求审批", english: "Never ask")),
+                    ]
                 ) { viewModel.updateSandbox(approvalPolicy: $0) }
                 picker(
-                    "审批人",
+                    model.localized("审批人", english: "Reviewer"),
                     selection: settings.defaultApprovalReviewer,
-                    values: [("user", "用户"), ("auto_review", "审批模型")]
+                    values: [
+                        ("user", model.localized("用户", english: "User")),
+                        ("auto_review", model.localized("审批模型", english: "Approval model")),
+                    ]
                 ) { viewModel.updateSandbox(approvalReviewer: $0) }
                 picker(
-                    "网络访问",
+                    model.localized("网络访问", english: "Network access"),
                     selection: settings.defaultNetworkAccess,
                     values: [
-                        ("disabled", "禁用"),
-                        ("controlled", "受控访问"),
-                        ("host", "跟随本机"),
+                        ("disabled", model.localized("禁用", english: "Disabled")),
+                        ("controlled", model.localized("受控访问", english: "Controlled")),
+                        ("host", model.localized("跟随本机", english: "Host access")),
                     ]
                 ) { viewModel.updateSandbox(networkAccess: $0) }
                 Divider()
-                LocalConnectorKeyValueRow(label: "当前 Profile", value: settings.defaultPermissionProfileName)
-                LocalConnectorKeyValueRow(label: "策略版本", value: settings.policyRevision ?? "—", monospaced: true)
+                LocalConnectorKeyValueRow(label: model.localized("当前 Profile", english: "Current profile"), value: settings.defaultPermissionProfileName)
+                LocalConnectorKeyValueRow(label: model.localized("策略版本", english: "Policy revision"), value: settings.policyRevision ?? "—", monospaced: true)
             } else {
-                ProgressView("正在读取权限策略…")
+                ProgressView(model.localized("正在读取权限策略…", english: "Loading access policy…"))
                     .frame(maxWidth: .infinity, minHeight: 100)
             }
         }
@@ -76,12 +83,15 @@ struct LocalConnectorSandboxView: View {
 
     private var backendCard: some View {
         LocalConnectorCard(
-            "运行后端",
-            subtitle: "当前版本只允许使用本机进程后端",
+            model.localized("运行后端", english: "Execution Backend"),
+            subtitle: model.localized(
+                "当前版本只允许使用本机进程后端",
+                english: "This version supports only the local process backend"
+            ),
             systemImage: "cpu"
         ) {
             if viewModel.sandboxBackends.isEmpty {
-                Text("没有可用的权限执行后端。")
+                Text(model.localized("没有可用的权限执行后端。", english: "No permission backend is available."))
                     .foregroundStyle(.secondary)
             } else {
                 VStack(spacing: 0) {
@@ -91,7 +101,9 @@ struct LocalConnectorSandboxView: View {
                                 .foregroundStyle(backend.status == "ready" ? .green : .orange)
                             VStack(alignment: .leading, spacing: 5) {
                                 HStack {
-                                    Text(backend.backend == "local_process" ? "本机进程" : backend.backend)
+                                    Text(backend.backend == "local_process"
+                                         ? model.localized("本机进程", english: "Local process")
+                                         : backend.backend)
                                         .appFont(.headline)
                                     Text(backend.status)
                                         .appFont(.caption2.monospaced())
@@ -101,9 +113,9 @@ struct LocalConnectorSandboxView: View {
                                     .appFont(.caption)
                                     .foregroundStyle(.secondary)
                                 HStack(spacing: 8) {
-                                    capability("文件隔离", enabled: backend.filesystemIsolation)
-                                    capability("网络隔离", enabled: backend.networkIsolation)
-                                    capability("进程树控制", enabled: backend.processTreeControl)
+                                    capability(model.localized("文件隔离", english: "File isolation"), enabled: backend.filesystemIsolation)
+                                    capability(model.localized("网络隔离", english: "Network isolation"), enabled: backend.networkIsolation)
+                                    capability(model.localized("进程树控制", english: "Process tree control"), enabled: backend.processTreeControl)
                                 }
                             }
                             Spacer()

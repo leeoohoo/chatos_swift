@@ -2,6 +2,7 @@ import ChatOSCore
 import SwiftUI
 
 struct MessageTaskInspectorView: View {
+    @EnvironmentObject private var model: AppModel
     @ObservedObject var viewModel: MessageTaskWorkspaceViewModel
 
     var body: some View {
@@ -47,7 +48,7 @@ struct MessageTaskInspectorView: View {
             }
             Picker("检查内容", selection: $viewModel.inspectorSection) {
                 ForEach(MessageTaskWorkspaceViewModel.InspectorSection.allCases, id: \.self) {
-                    Text($0.rawValue).tag($0)
+                    Text($0.title(language: model.interfaceLanguage)).tag($0)
                 }
             }
             .pickerStyle(.segmented)
@@ -61,7 +62,8 @@ struct MessageTaskInspectorView: View {
         TaskInspectorTitle(task: task)
         MessageTaskDetailSections(
             task: task,
-            isLoadingModelOutput: viewModel.isLoadingModelOutput
+            isLoadingModelOutput: viewModel.isLoadingModelOutput,
+            allowsTextSelection: false
         )
         if task.normalizedStatus == "blocked" || task.normalizedStatus == "failed" {
             blockedActions(task)
@@ -75,7 +77,8 @@ struct MessageTaskInspectorView: View {
             items: TaskProcessTimelineBuilder.build(
                 processLog: task.processLog,
                 taskStatus: task.status
-            )
+            ),
+            allowsTextSelection: false
         )
     }
 
@@ -86,16 +89,24 @@ struct MessageTaskInspectorView: View {
             ProgressView("正在加载运行详情…")
         } else if let detail = viewModel.runDetail {
             if let output = detail.run.reportContent {
-                TaskDetailTextCard(title: "模型输出", text: output)
+                TaskDetailTextCard(
+                    title: "模型输出",
+                    text: output,
+                    allowsTextSelection: false
+                )
             }
             if let summary = detail.run.resultSummary,
                summary.trimmingCharacters(in: .whitespacesAndNewlines)
                 != detail.run.reportContent?.trimmingCharacters(in: .whitespacesAndNewlines) {
-                TaskDetailTextCard(title: "运行结果摘要", text: summary)
+                TaskDetailTextCard(
+                    title: "运行结果摘要",
+                    text: summary,
+                    allowsTextSelection: false
+                )
             }
             VStack(alignment: .leading, spacing: 10) {
                 Text("运行信息").appFont(.subheadline.weight(.semibold))
-                LabeledContent("状态", value: detail.run.status ?? "未知")
+                LabeledContent("状态", value: displayedRunStatus(task: task, run: detail.run))
                 LabeledContent("运行 ID", value: detail.run.id)
                 if let startedAt = detail.run.startedAt {
                     LabeledContent("开始时间") { Text(startedAt, style: .date) + Text(" ") + Text(startedAt, style: .time) }
@@ -106,7 +117,10 @@ struct MessageTaskInspectorView: View {
                 if let error = detail.run.errorMessage { textSection("错误", error) }
             }
             if !detail.events.isEmpty {
-                TaskRunEventTimeline(events: detail.events)
+                TaskRunEventTimeline(
+                    events: detail.events,
+                    allowsTextSelection: false
+                )
                 if detail.eventsHasMore {
                     Button {
                         viewModel.loadMoreRunEvents()
@@ -168,7 +182,28 @@ struct MessageTaskInspectorView: View {
             Text(text)
                 .appFont(.callout)
                 .foregroundStyle(.secondary)
-                .textSelection(.enabled)
+                .appTextSelection(false)
+        }
+    }
+
+    private func displayedRunStatus(task: MessageTask, run: MessageTaskRun) -> String {
+        let taskStatus = task.normalizedStatus
+        let terminalTaskStatuses = [
+            "completed", "done", "succeeded", "success",
+            "blocked", "failed", "error", "cancelled", "canceled", "stopped",
+        ]
+        let status = terminalTaskStatuses.contains(taskStatus)
+            ? taskStatus
+            : (run.status?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                ?? taskStatus)
+        return switch status {
+        case "running", "processing", "in_progress", "executing": model.localized("执行中", english: "Running")
+        case "queued", "queueing": model.localized("排队中", english: "Queued")
+        case "blocked": model.localized("已阻塞", english: "Blocked")
+        case "failed", "error": model.localized("执行失败", english: "Execution Failed")
+        case "completed", "done", "succeeded", "success": model.localized("已完成", english: "Completed")
+        case "cancelled", "canceled", "stopped": model.localized("已取消", english: "Cancelled")
+        default: status.isEmpty ? model.localized("未知", english: "Unknown") : status
         }
     }
 }

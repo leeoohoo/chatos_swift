@@ -43,6 +43,7 @@ public protocol LocalConnectorControlServicing: Sendable {
     func installPlugin(id: String) async throws
     func uninstallPlugin(id: String) async throws
     func updatePluginEnabled(id: String, enabled: Bool) async throws
+    func requestPluginPermission(pluginID: String, permissionID: String) async throws
 }
 
 public extension LocalConnectorControlServicing {
@@ -53,4 +54,7 @@ public extension LocalConnectorControlServicing {
     func deleteModelProvider(id: String) async throws {}
     func updateModelConfig(id: String, update: LocalConnectorModelConfigUpdate) async throws {}
     func updateModelSettings(_ settings: LocalConnectorModelSettings) async throws {}
+    func requestPluginPermission(pluginID: String, permissionID: String) async throws {
+        _ = try await requestSystemPermission(id: permissionID)
+    }
 }

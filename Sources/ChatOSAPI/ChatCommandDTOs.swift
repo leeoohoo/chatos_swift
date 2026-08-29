@@ -24,6 +24,7 @@ struct RuntimeSettingsDTO: Decodable, Sendable {
 struct ModelConfigDTO: Decodable, Sendable {
     var id: String
     var name: String
+    var provider: String?
     var model: String?
     var modelNameValue: String?
     var thinkingLevel: String?
@@ -31,7 +32,7 @@ struct ModelConfigDTO: Decodable, Sendable {
     var enabled: Bool?
 
     enum CodingKeys: String, CodingKey {
-        case id, name, model, temperature, enabled
+        case id, name, provider, model, temperature, enabled
         case modelNameValue = "model_name"
         case thinkingLevel = "thinking_level"
     }
@@ -89,6 +90,21 @@ struct GuidanceRequestDTO: Encodable {
         case conversationID = "conversation_id"
         case turnID = "turn_id"
     }
+}
+
+struct StopChatRequestDTO: Encodable {
+    var conversationID: String
+    var turnID: String?
+
+    enum CodingKeys: String, CodingKey {
+        case conversationID = "conversation_id"
+        case turnID = "turn_id"
+    }
+}
+
+struct StopChatResponseDTO: Decodable, Sendable {
+    var success: Bool
+    var message: String?
 }
 
 struct ChatCommandResponseDTO: Decodable, Sendable {

@@ -1,8 +1,10 @@
 import ChatOSCore
 import AppKit
+import Foundation
 import SwiftUI
 
 struct MessageTaskWorkspaceSheet: View {
+    @EnvironmentObject private var model: AppModel
     @StateObject private var viewModel: MessageTaskWorkspaceViewModel
     @State private var isFullscreen = false
     @Environment(\.dismiss) private var dismiss
@@ -10,13 +12,19 @@ struct MessageTaskWorkspaceSheet: View {
     init(
         turn: ConversationTurn,
         graphService: any MessageTaskGraphServicing,
-        projectExecutionService: (any ProjectExecutionServicing)?
+        projectExecutionService: (any ProjectExecutionServicing)?,
+        realtimeService: (any ConversationRealtimeStreaming)? = nil,
+        initialTaskID: String? = nil,
+        initialRunID: String? = nil
     ) {
         _viewModel = StateObject(
             wrappedValue: MessageTaskWorkspaceViewModel(
                 turn: turn,
                 graphService: graphService,
-                projectExecutionService: projectExecutionService
+                projectExecutionService: projectExecutionService,
+                realtimeService: realtimeService,
+                initialTaskID: initialTaskID,
+                initialRunID: initialRunID
             )
         )
     }
@@ -30,10 +38,14 @@ struct MessageTaskWorkspaceSheet: View {
                 .workspaceFill()
         }
         .frame(width: workspaceSize.width, height: workspaceSize.height)
+        .environment(\.locale, model.interfaceLocale)
         .background(Color(nsColor: .windowBackgroundColor))
         .animation(.easeInOut(duration: 0.2), value: isFullscreen)
         .task { viewModel.load() }
-        .onDisappear { viewModel.stopPolling() }
+        .onDisappear {
+            viewModel.stopPolling()
+            viewModel.stopRealtime()
+        }
     }
 
     private var header: some View {
@@ -88,6 +100,35 @@ struct MessageTaskWorkspaceSheet: View {
 
     @ViewBuilder
     private var content: some View {
+        if viewModel.executionState.isProjectExecution {
+            VStack(spacing: 0) {
+                ProjectExecutionActivityView(viewModel: viewModel)
+                    .frame(height: executionActivityHeight)
+                Divider()
+                graphContent
+                    .workspaceFill()
+            }
+        } else {
+            graphContent
+        }
+    }
+
+    private var executionActivityHeight: CGFloat {
+        let visibleRowCount = min(viewModel.executionActivity.count, 3)
+        guard visibleRowCount > 0 else { return 88 }
+
+        let headerHeight: CGFloat = 45
+        let verticalContentPadding: CGFloat = 28
+        let rowHeight: CGFloat = 42
+        let rowSpacing = CGFloat(max(0, visibleRowCount - 1)) * 10
+        return min(
+            220,
+            headerHeight + verticalContentPadding + CGFloat(visibleRowCount) * rowHeight + rowSpacing
+        )
+    }
+
+    @ViewBuilder
+    private var graphContent: some View {
         Group {
             if viewModel.isLoading && viewModel.graph == nil {
                 ProgressView("正在加载真实任务图…")
@@ -110,7 +151,22 @@ struct MessageTaskWorkspaceSheet: View {
                     MessageTaskInspectorView(viewModel: viewModel)
                 }
             } else {
-                if viewModel.executionState.isProjectExecution {
+                if [.failed, .blocked].contains(viewModel.executionState.phase) {
+                    ContentUnavailableView(
+                        "执行计划生成失败",
+                        systemImage: "exclamationmark.triangle",
+                        description: Text(
+                            viewModel.executionFailureReason
+                                ?? "规划 Agent 未能创建任务节点，请检查上方执行过程后重新生成。"
+                        )
+                    )
+                } else if viewModel.executionState.phase == .planning {
+                    ContentUnavailableView(
+                        "正在等待第一个任务节点",
+                        systemImage: "wand.and.stars",
+                        description: Text("规划 Agent 创建任务后，流程图会在这里自动更新。")
+                    )
+                } else if viewModel.executionState.isProjectExecution {
                     ContentUnavailableView(
                         "未找到关联任务图",
                         systemImage: "link.badge.plus",
@@ -126,5 +182,82 @@ struct MessageTaskWorkspaceSheet: View {
             }
         }
         .workspaceFill()
+    }
+}
+
+private struct ProjectExecutionActivityView: View {
+    @ObservedObject var viewModel: MessageTaskWorkspaceViewModel
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Label("AI 执行过程", systemImage: "sparkles")
+                    .appFont(.headline)
+                Spacer()
+                StatusCapsule(
+                    title: "\(viewModel.executionActivity.count) 条记录",
+                    color: AppPalette.ai
+                )
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 11)
+            Divider()
+
+            ScrollView {
+                if viewModel.executionActivity.isEmpty {
+                    Text("正在等待 AI 返回执行进度…")
+                        .appFont(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(14)
+                } else {
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(viewModel.executionActivity) { update in
+                            HStack(alignment: .top, spacing: 10) {
+                                Image(systemName: icon(update.status))
+                                    .appFont(.caption.weight(.semibold))
+                                    .foregroundStyle(color(update.status))
+                                    .frame(width: 18, height: 18)
+                                    .background(color(update.status).opacity(0.12), in: Circle())
+                                VStack(alignment: .leading, spacing: 3) {
+                                    HStack(alignment: .firstTextBaseline) {
+                                        Text(update.title).appFont(.callout.weight(.medium))
+                                        Spacer(minLength: 12)
+                                        if let date = ISO8601DateFormatter().date(from: update.timestamp) {
+                                            Text(date, style: .time)
+                                                .appFont(.caption2.monospacedDigit())
+                                                .foregroundStyle(.tertiary)
+                                        }
+                                    }
+                                    if let detail = update.detail, !detail.isEmpty {
+                                        Text(detail)
+                                            .appFont(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(14)
+                }
+            }
+        }
+        .background(AppPalette.canvas)
+    }
+
+    private func icon(_ status: String) -> String {
+        switch status.lowercased() {
+        case "completed": "checkmark"
+        case "failed", "cancelled": "exclamationmark"
+        default: "arrow.triangle.2.circlepath"
+        }
+    }
+
+    private func color(_ status: String) -> Color {
+        switch status.lowercased() {
+        case "completed": .green
+        case "failed", "cancelled": .red
+        default: AppPalette.ai
+        }
     }
 }

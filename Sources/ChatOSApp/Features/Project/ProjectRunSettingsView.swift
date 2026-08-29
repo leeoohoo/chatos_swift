@@ -2,6 +2,7 @@ import ChatOSCore
 import SwiftUI
 
 struct ProjectRunSettingsView: View {
+    @EnvironmentObject private var model: AppModel
     @StateObject private var viewModel: ProjectRunSettingsViewModel
     let projectName: String
     let rootPath: String?
@@ -18,7 +19,9 @@ struct ProjectRunSettingsView: View {
                 pageHeader
                 if let error = viewModel.catalog?.errorMessage { notice(error, color: .red, icon: "exclamationmark.triangle.fill") }
                 if let error = viewModel.errorMessage { notice(error, color: .red, icon: "exclamationmark.triangle.fill") }
-                if let message = viewModel.message { notice(message, color: .green, icon: "checkmark.circle.fill") }
+                if let statusNotice = viewModel.notice {
+                    notice(noticeText(statusNotice), color: .green, icon: "checkmark.circle.fill")
+                }
                 preflightSection
                 targetsSection
                 ProjectRunInstancesSection(viewModel: viewModel)
@@ -41,10 +44,19 @@ struct ProjectRunSettingsView: View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 5) {
                 Text(projectName).appFont(.title2.weight(.semibold))
-                Text(rootPath ?? "未配置项目目录").appFont(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
+                Text(rootPath ?? model.localized("未配置项目目录", english: "Project Folder Not Configured"))
+                    .appFont(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
                 HStack {
                     StatusCapsule(title: runStatusTitle, color: runStatusColor)
-                    StatusCapsule(title: "运行目标 \(viewModel.targets.count)", color: .secondary)
+                    StatusCapsule(
+                        title: model.localized(
+                            "运行目标 \(viewModel.targets.count)",
+                            english: "\(viewModel.targets.count) Run Targets"
+                        ),
+                        color: .secondary
+                    )
                 }
             }
             Spacer()
@@ -85,18 +97,29 @@ struct ProjectRunSettingsView: View {
                 }
                 if let target = viewModel.selectedTarget {
                     Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 9) {
-                        settingRow("命令", target.command)
-                        settingRow("工作目录", target.cwd)
-                        if let language = target.language { settingRow("语言", language) }
-                        settingRow("来源", target.source)
-                        if let manifest = target.manifestPath { settingRow("清单", manifest) }
-                        if let entrypoint = target.entrypoint { settingRow("入口", entrypoint) }
+                        settingRow(model.localized("命令", english: "Command"), target.command)
+                        settingRow(model.localized("工作目录", english: "Working Directory"), target.cwd)
+                        if let language = target.language {
+                            settingRow(model.localized("语言", english: "Language"), language)
+                        }
+                        settingRow(model.localized("来源", english: "Source"), target.source)
+                        if let manifest = target.manifestPath {
+                            settingRow(model.localized("清单", english: "Manifest"), manifest)
+                        }
+                        if let entrypoint = target.entrypoint {
+                            settingRow(model.localized("入口", english: "Entrypoint"), entrypoint)
+                        }
                     }
                     .appFont(.caption)
                     .textSelection(.enabled)
                     HStack {
                         Spacer()
-                        Button(viewModel.isMutating ? "启动中…" : "启动新实例", systemImage: "play.fill") { Task { await viewModel.start() } }
+                        Button(
+                            viewModel.isMutating
+                                ? model.localized("启动中…", english: "Starting…")
+                                : model.localized("启动新实例", english: "Start New Instance"),
+                            systemImage: "play.fill"
+                        ) { Task { await viewModel.start() } }
                             .buttonStyle(.borderedProminent)
                             .disabled(viewModel.isMutating || !(viewModel.environment?.validationIssues.isEmpty ?? true))
                     }
@@ -147,13 +170,30 @@ struct ProjectRunSettingsView: View {
     private var runStatusColor: Color { viewModel.state?.isRunning == true ? .green : .secondary }
     private func localizedRunStatus(_ status: String) -> String {
         switch status.lowercased() {
-        case "running": "运行中"
-        case "ready": "就绪"
-        case "stopped", "exited": "已停止"
-        case "error", "failed": "异常"
-        case "idle": "空闲"
-        case "loading": "加载中"
+        case "running": model.localized("运行中", english: "Running")
+        case "ready": model.localized("就绪", english: "Ready")
+        case "stopped", "exited": model.localized("已停止", english: "Stopped")
+        case "error", "failed": model.localized("异常", english: "Error")
+        case "idle": model.localized("空闲", english: "Idle")
+        case "loading": model.localized("加载中", english: "Loading")
         default: status
+        }
+    }
+
+    private func noticeText(_ notice: ProjectRunSettingsViewModel.Notice) -> String {
+        switch notice {
+        case .analyzed:
+            model.localized("项目运行目标已重新分析。", english: "Project run targets were analyzed again.")
+        case .defaultTargetSaved:
+            model.localized("默认运行目标已保存。", english: "The default run target was saved.")
+        case .environmentSaved:
+            model.localized("工具链和环境变量已保存。", english: "Toolchains and environment variables were saved.")
+        case .instanceStarted:
+            model.localized("运行实例已启动。", english: "The run instance was started.")
+        case .stopRequested:
+            model.localized("已向实例发送停止信号。", english: "A stop signal was sent to the instance.")
+        case .instanceDeleted:
+            model.localized("运行实例已删除。", english: "The run instance was deleted.")
         }
     }
 }
@@ -164,7 +204,7 @@ struct SettingsCard<Content: View>: View {
     @ViewBuilder let content: () -> Content
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Label(title, systemImage: systemImage).appFont(.headline)
+            Label(LocalizedStringKey(title), systemImage: systemImage).appFont(.headline)
             content()
         }
         .padding(17)

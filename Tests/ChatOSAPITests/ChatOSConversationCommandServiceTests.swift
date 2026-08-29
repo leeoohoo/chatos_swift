@@ -35,6 +35,7 @@ final class ChatOSConversationCommandServiceTests: XCTestCase {
         XCTAssertEqual(payload["plan_mode"] as? Bool, false)
         let model = try XCTUnwrap(payload["ai_model_config"] as? [String: Any])
         XCTAssertEqual(model["model_name"] as? String, "gpt-5.6-terra")
+        XCTAssertEqual(model["thinking_level"] as? String, "medium")
     }
 
     func testCommandOverrideCarriesPlanModeToRustBackend() async throws {
@@ -81,6 +82,29 @@ final class ChatOSConversationCommandServiceTests: XCTestCase {
         let capturedGuidanceRequest = await transport.guidanceRequest()
         let request = try XCTUnwrap(capturedGuidanceRequest)
         XCTAssertEqual(request.url.path, "/api/chatos/agent/chat/guidance")
+    }
+
+    func testStopTurnUsesConversationAndTurnScope() async throws {
+        let transport = CommandTransport()
+        let client = ChatOSAPIClient(
+            configuration: .init(baseURL: URL(string: "https://example.com/api/chatos")!),
+            accessToken: "token",
+            transport: transport
+        )
+
+        try await ChatOSConversationCommandService(client: client).stopTurn(
+            conversationID: "conversation-1",
+            turnID: "turn-running"
+        )
+
+        let capturedRequest = await transport.stopRequest()
+        let request = try XCTUnwrap(capturedRequest)
+        XCTAssertEqual(request.url.path, "/api/chatos/agent/chat/stop")
+        XCTAssertEqual(request.method, "POST")
+        let body = try XCTUnwrap(request.body)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(payload["conversation_id"] as? String, "conversation-1")
+        XCTAssertEqual(payload["turn_id"] as? String, "turn-running")
     }
 
     func testUploadedAttachmentsAreIncludedInChatCommand() async throws {
@@ -202,13 +226,15 @@ private actor CommandTransport: HTTPTransport {
         let body: String
         switch request.url.path {
         case "/api/chatos/conversations/conversation-1/runtime-settings":
-            body = #"{"selected_model_id":"model-config-1","selected_model_name":"gpt-5.6-terra","selected_thinking_level":"medium","remote_connection_id":null,"workspace_root":"/workspace","reasoning_enabled":true,"plan_mode_enabled":false}"#
+            body = #"{"selected_model_id":"model-config-1","selected_model_name":"gpt-5.6-luna","selected_thinking_level":"high","remote_connection_id":null,"workspace_root":"/workspace","reasoning_enabled":true,"plan_mode_enabled":false}"#
         case "/api/chatos/ai-model-configs":
             body = #"[{"id":"model-config-1","name":"Terra","model_name":"gpt-5.6-terra","thinking_level":"medium","temperature":0.5,"enabled":true}]"#
         case "/api/chatos/agent/chat/send":
             body = #"{"accepted":true,"turn_id":"turn-1","user_message_id":"message-1"}"#
         case "/api/chatos/agent/chat/guidance":
             body = #"{"accepted":true,"turn_id":"turn-running"}"#
+        case "/api/chatos/agent/chat/stop":
+            body = #"{"success":true,"message":"停止中"}"#
         default:
             return HTTPResponse(statusCode: 404, headers: [:], body: Data())
         }
@@ -221,5 +247,9 @@ private actor CommandTransport: HTTPTransport {
 
     func guidanceRequest() -> HTTPRequest? {
         requests.first { $0.url.path.hasSuffix("/agent/chat/guidance") }
+    }
+
+    func stopRequest() -> HTTPRequest? {
+        requests.first { $0.url.path.hasSuffix("/agent/chat/stop") }
     }
 }

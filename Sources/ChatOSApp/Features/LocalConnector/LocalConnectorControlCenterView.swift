@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct LocalConnectorControlCenterView: View {
+    @EnvironmentObject private var model: AppModel
     @ObservedObject var viewModel: LocalConnectorControlCenterViewModel
 
     var body: some View {
@@ -8,10 +9,11 @@ struct LocalConnectorControlCenterView: View {
             navigation
                 .frame(minWidth: 190, idealWidth: 210, maxWidth: 240)
             content
+                .appFont(.body)
                 .frame(minWidth: 620, maxWidth: .infinity, maxHeight: .infinity)
         }
         .workspaceFill()
-        .navigationTitle("本机控制中心")
+        .navigationTitle(model.localized("本机控制中心", english: "Native Control Center"))
         .task {
             viewModel.refreshSelectedTab()
         }
@@ -23,9 +25,9 @@ struct LocalConnectorControlCenterView: View {
 
     private var navigation: some View {
         List(selection: $viewModel.selectedTab) {
-            Section("控制中心") {
+            Section(model.localized("控制中心", english: "Control Center")) {
                 ForEach(LocalConnectorControlTab.allCases) { tab in
-                    Label(tab.rawValue, systemImage: tab.systemImage)
+                    Label(tab.title(language: model.interfaceLanguage), systemImage: tab.systemImage)
                         .tag(tab)
                 }
             }
@@ -97,9 +99,9 @@ struct LocalConnectorControlCenterView: View {
                     .appFont(.caption2.weight(.semibold))
                     .tracking(0.8)
                     .foregroundStyle(.secondary)
-                Text(viewModel.selectedTab.rawValue)
+                Text(viewModel.selectedTab.title(language: model.interfaceLanguage))
                     .appFont(.title2.weight(.semibold))
-                Text(viewModel.selectedTab.description)
+                Text(viewModel.selectedTab.description(language: model.interfaceLanguage))
                     .appFont(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -108,11 +110,11 @@ struct LocalConnectorControlCenterView: View {
                 ProgressView()
                     .controlSize(.small)
             }
-            Button("刷新", systemImage: "arrow.clockwise") {
+            Button(model.localized("刷新", english: "Refresh"), systemImage: "arrow.clockwise") {
                 viewModel.refreshSelectedTab()
             }
             .labelStyle(.iconOnly)
-            .help("刷新当前页面")
+            .help(model.localized("刷新当前页面", english: "Refresh this page"))
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 18)
@@ -126,7 +128,7 @@ struct LocalConnectorControlCenterView: View {
                 .appFont(.callout)
                 .textSelection(.enabled)
             Spacer()
-            Button("关闭", systemImage: "xmark", action: viewModel.clearMessages)
+            Button(model.localized("关闭", english: "Dismiss"), systemImage: "xmark", action: viewModel.clearMessages)
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
         }
@@ -142,13 +144,24 @@ struct LocalConnectorControlCenterView: View {
     }
 
     private var connectionLabel: String {
-        guard let status = viewModel.status else { return "正在启动" }
-        if status.connectorRunning { return "连接正常" }
-        return status.configured ? "等待网关" : "等待配对"
+        guard let status = viewModel.status else {
+            return model.localized("正在启动", english: "Starting")
+        }
+        if status.connectorRunning {
+            return model.localized("连接正常", english: "Connected")
+        }
+        return status.configured
+            ? model.localized("等待网关", english: "Waiting for gateway")
+            : model.localized("等待配对", english: "Waiting for pairing")
     }
 }
 
 struct LocalConnectorCard<Content: View>: View {
+    // This component is shared by the Settings window and the standalone
+    // connector control center. Keep its structure container-neutral: turning
+    // it into Form/Section changes the semantics of every dynamic TextField
+    // page and can create an AttributeGraph update loop.
+    @Environment(\.localConnectorCardPresentation) private var presentation
     var title: String
     var subtitle: String?
     var systemImage: String
@@ -166,7 +179,16 @@ struct LocalConnectorCard<Content: View>: View {
         self.content = content()
     }
 
+    @ViewBuilder
     var body: some View {
+        if presentation == .settingsGrouped {
+            settingsGroupedBody
+        } else {
+            cardBody
+        }
+    }
+
+    private var cardBody: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 10) {
                 Image(systemName: systemImage)
@@ -192,6 +214,65 @@ struct LocalConnectorCard<Content: View>: View {
                 .stroke(.separator.opacity(0.65), lineWidth: 1)
         }
     }
+
+    private var settingsGroupedBody: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(title, systemImage: systemImage)
+                .appFont(.headline)
+                .padding(.horizontal, 10)
+            VStack(alignment: .leading, spacing: 14) {
+                content
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
+            if let subtitle {
+                Text(subtitle)
+                    .appFont(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+            }
+        }
+    }
+}
+
+enum LocalConnectorCardPresentation {
+    case card
+    case settingsGrouped
+}
+
+private struct LocalConnectorCardPresentationKey: EnvironmentKey {
+    static let defaultValue = LocalConnectorCardPresentation.card
+}
+
+extension EnvironmentValues {
+    var localConnectorCardPresentation: LocalConnectorCardPresentation {
+        get { self[LocalConnectorCardPresentationKey.self] }
+        set { self[LocalConnectorCardPresentationKey.self] = newValue }
+    }
+}
+
+struct SettingsGroupedPage<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        // Reproduce the old macOS grouped-settings appearance with stable
+        // ScrollView/VStack layout. Do not replace this with Form globally:
+        // model and plugin pages contain dynamic grids and editable controls.
+        ScrollView {
+            VStack(spacing: 22) {
+                content
+            }
+            .padding(24)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .background(AppPalette.canvas)
+        .environment(\.localConnectorCardPresentation, .settingsGrouped)
+    }
 }
 
 struct LocalConnectorKeyValueRow: View {
@@ -202,6 +283,7 @@ struct LocalConnectorKeyValueRow: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 16) {
             Text(label)
+                .appFont(.callout)
                 .foregroundStyle(.secondary)
             Spacer(minLength: 20)
             Text(value)

@@ -136,7 +136,7 @@ private struct MessageInlineImage: View {
 
     private func imagePlaceholder(systemImage: String) -> some View {
         Image(systemName: systemImage)
-            .font(.system(size: 24))
+            .appFont(.system(size: 24))
             .foregroundStyle(.secondary)
             .frame(width: 220, height: 140)
     }
@@ -255,7 +255,7 @@ struct ComposerAttachmentPreview: View {
                   let text = String(data: attachment.data, encoding: .utf8) {
             ScrollView {
                 Text(text)
-                    .font(.system(.body, design: .monospaced))
+                    .appFont(.system(.body, design: .monospaced))
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(20)

@@ -11,6 +11,7 @@ final class LocalConnectorControlCenterViewModel: ObservableObject {
     @Published private(set) var terminalResult: LocalConnectorTerminalResult?
     @Published private(set) var approvalSettings: LocalConnectorApprovalSettings?
     @Published private(set) var pendingApprovals: [LocalConnectorPendingApproval] = []
+    @Published private(set) var latestApprovalEvent: LocalConnectorApprovalEvent?
     @Published private(set) var modelCatalog: LocalConnectorModelCatalog?
     @Published private(set) var modelProviders: [LocalConnectorModelProvider] = []
     @Published private(set) var sandboxBackends: [LocalConnectorSandboxBackend] = []
@@ -25,6 +26,9 @@ final class LocalConnectorControlCenterViewModel: ObservableObject {
 
     private let service: any LocalConnectorControlServicing
     private var refreshGeneration: Int64 = 0
+    private var approvalMonitorTask: Task<Void, Never>?
+    private var approvalStreamTask: Task<Void, Never>?
+    private var approvalEventStreamTask: Task<Void, Never>?
 
     init(
         service: any LocalConnectorControlServicing
@@ -33,6 +37,7 @@ final class LocalConnectorControlCenterViewModel: ObservableObject {
     }
 
     func activate(pairIfNeeded: Bool) {
+        startApprovalMonitoring()
         isStarting = true
         refreshStatus(pairIfNeeded: pairIfNeeded)
     }
@@ -88,6 +93,25 @@ final class LocalConnectorControlCenterViewModel: ObservableObject {
         }
     }
 
+    func resetForSignedOut() {
+        stopApprovalMonitoring()
+        refreshGeneration += 1
+        isStarting = false
+        isLoading = false
+        isPerformingAction = false
+        pluginOperationIDs = []
+        errorMessage = nil
+        notice = nil
+        status = nil
+        approvalSettings = nil
+        pendingApprovals = []
+        latestApprovalEvent = nil
+        plugins = []
+        Task {
+            _ = try? await service.disconnect()
+        }
+    }
+
     func reconnect() {
         performAction(successNotice: "设备已重新配对。") {
             self.status = try await self.service.pairWithCurrentChatOSSession(
@@ -130,6 +154,45 @@ final class LocalConnectorControlCenterViewModel: ObservableObject {
         }
     }
 
+    func startApprovalMonitoring() {
+        if approvalStreamTask == nil,
+           let streamingService = service as? any LocalConnectorApprovalStreaming {
+            approvalStreamTask = Task { [weak self] in
+                let stream = await streamingService.approvalSnapshots()
+                for await approvals in stream {
+                    guard let self, !Task.isCancelled else { return }
+                    self.pendingApprovals = approvals
+                }
+            }
+        }
+        if approvalEventStreamTask == nil,
+           let streamingService = service as? any LocalConnectorApprovalStreaming {
+            approvalEventStreamTask = Task { [weak self] in
+                let stream = await streamingService.approvalEvents()
+                for await event in stream {
+                    guard let self, !Task.isCancelled else { return }
+                    self.latestApprovalEvent = event
+                }
+            }
+        }
+        guard approvalMonitorTask == nil else { return }
+        approvalMonitorTask = Task { [weak self] in
+            while !Task.isCancelled {
+                await self?.refreshPendingApprovalsSilently()
+                try? await Task.sleep(for: .seconds(2))
+            }
+        }
+    }
+
+    func stopApprovalMonitoring() {
+        approvalStreamTask?.cancel()
+        approvalStreamTask = nil
+        approvalEventStreamTask?.cancel()
+        approvalEventStreamTask = nil
+        approvalMonitorTask?.cancel()
+        approvalMonitorTask = nil
+    }
+
     func updateApprovalMode(
         _ mode: LocalConnectorApprovalMode,
         riskAcknowledged: Bool
@@ -167,8 +230,14 @@ final class LocalConnectorControlCenterViewModel: ObservableObject {
     }
 
     func requestPermission(id: String) {
-        performAction(successNotice: "系统授权入口已打开，授权后请刷新状态。") {
+        performAction(successNotice: "系统授权引导已打开；完成后可重新检测状态。") {
             self.systemPermissions = try await self.service.requestSystemPermission(id: id)
+        }
+    }
+
+    func refreshPermissions() {
+        performAction(successNotice: "系统权限状态已重新检测。") {
+            self.systemPermissions = try await self.service.fetchSystemPermissions()
         }
     }
 
@@ -278,6 +347,22 @@ final class LocalConnectorControlCenterViewModel: ObservableObject {
         }
     }
 
+    func requestPluginPermission(pluginID: String, permissionID: String) {
+        performPluginAction(
+            id: pluginID,
+            successNotice: "已打开该 Plugin 的系统授权引导；完成授权后请重新检测。"
+        ) {
+            try await self.service.requestPluginPermission(
+                pluginID: pluginID,
+                permissionID: permissionID
+            )
+        }
+    }
+
+    func refreshPluginPermissions(id: String) {
+        performPluginAction(id: id, successNotice: "Plugin 权限状态已重新检测。") {}
+    }
+
     func clearMessages() {
         errorMessage = nil
         notice = nil
@@ -313,6 +398,15 @@ final class LocalConnectorControlCenterViewModel: ObservableObject {
             if selectedTab == requestedTab {
                 isLoading = false
             }
+        }
+    }
+
+    private func refreshPendingApprovalsSilently() async {
+        do {
+            pendingApprovals = try await service.fetchPendingApprovals()
+        } catch {
+            // The native connector may briefly restart while the app stays open.
+            // Keep the last known queue and let the next polling cycle retry.
         }
     }
 

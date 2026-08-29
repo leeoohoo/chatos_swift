@@ -63,7 +63,8 @@ struct ProjectExecutionStatusBanner: View {
                 tint: .secondary
             )
         }
-        if let message = viewModel.planActionMessage {
+        if let message = viewModel.planActionMessage,
+           viewModel.executionState.phase == .running {
             return Presentation(icon: "checkmark.circle.fill", title: "已开始执行", detail: message, tint: .green)
         }
         switch viewModel.executionState.phase {
@@ -84,9 +85,21 @@ struct ProjectExecutionStatusBanner: View {
         case .completed:
             return Presentation(icon: "checkmark.circle.fill", title: "任务已完成", detail: "这批任务的所有节点均已完成。", tint: .green)
         case .blocked:
-            return Presentation(icon: "exclamationmark.octagon.fill", title: "执行存在阻塞", detail: "选择阻塞节点查看详情、补充指令并重试。", tint: .red)
+            return Presentation(
+                icon: "exclamationmark.octagon.fill",
+                title: "执行存在阻塞",
+                detail: viewModel.executionFailureReason
+                    ?? "选择阻塞节点查看详情、补充指令并重试。",
+                tint: .red
+            )
         case .failed:
-            return Presentation(icon: "xmark.octagon.fill", title: "执行失败或已取消", detail: "选择节点检查运行详情，或清理本次失败计划。", tint: .red)
+            return Presentation(
+                icon: "xmark.octagon.fill",
+                title: "执行失败或已取消",
+                detail: viewModel.executionFailureReason
+                    ?? "选择节点检查运行详情，或清理本次失败计划。",
+                tint: .red
+            )
         case .stopped:
             return Presentation(icon: "stop.circle.fill", title: "执行计划已停止", detail: "任务未继续执行。", tint: .secondary)
         case .graphUnavailable:

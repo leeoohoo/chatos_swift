@@ -3,15 +3,19 @@ import ChatOSCore
 import SwiftUI
 
 struct ProjectDirectoryView: View {
+    @EnvironmentObject private var model: AppModel
     @StateObject private var viewModel: ProjectDirectoryViewModel
+    @StateObject private var gitViewModel: ProjectGitViewModel
     @State private var createKind: CreateKind?
     @State private var createName = ""
+    @State private var sidebarMode: ProjectDirectorySidebarMode = .files
 
     init(
         projectID: String,
         rootPath: String?,
         service: any ProjectFilesystemServicing,
-        codeNavigationService: any ProjectCodeNavigationServicing
+        codeNavigationService: any ProjectCodeNavigationServicing,
+        gitService: any ProjectGitServicing
     ) {
         _viewModel = StateObject(wrappedValue: ProjectDirectoryViewModel(
             projectID: projectID,
@@ -19,44 +23,118 @@ struct ProjectDirectoryView: View {
             service: service,
             codeNavigationService: codeNavigationService
         ))
+        _gitViewModel = StateObject(wrappedValue: ProjectGitViewModel(
+            projectRoot: rootPath,
+            service: gitService
+        ))
     }
 
     var body: some View {
         HSplitView {
-            browser
-                .frame(minWidth: 270, idealWidth: 330, maxWidth: 460)
-            ProjectFileEditorView(viewModel: viewModel)
+            sidebar
+                .frame(minWidth: 290, idealWidth: 360, maxWidth: 520)
+            editor
                 .frame(minWidth: 520)
         }
         .workspaceFill()
         .task { await viewModel.load() }
+        .onChange(of: sidebarMode) { _, mode in
+            guard mode == .git else { return }
+            Task { await gitViewModel.load() }
+        }
+        .onChange(of: gitViewModel.worktreeRevision) { _, _ in
+            Task { await viewModel.refresh() }
+        }
         .onChange(of: viewModel.searchText) { _, _ in viewModel.scheduleSearch() }
-        .alert("项目目录操作失败", isPresented: errorPresented) {
-            Button("好") { viewModel.dismissError() }
+        .alert(model.localized("项目目录操作失败", english: "Project directory operation failed"), isPresented: errorPresented) {
+            Button(model.localized("好", english: "OK")) { viewModel.dismissError() }
         } message: {
-            Text(viewModel.errorMessage ?? "未知错误")
+            Text(viewModel.errorMessage ?? model.localized("未知错误", english: "Unknown error"))
         }
         .sheet(item: $createKind) { kind in createSheet(kind) }
     }
 
-    private var browser: some View {
+    private var sidebar: some View {
+        VStack(spacing: 0) {
+            Picker(model.localized("项目目录工具", english: "Project directory tools"), selection: $sidebarMode) {
+                Label(model.localized("文件", english: "Files"), systemImage: "folder")
+                    .tag(ProjectDirectorySidebarMode.files)
+                Label(gitTabTitle, systemImage: "arrow.triangle.branch")
+                    .tag(ProjectDirectorySidebarMode.git)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(10)
+            .background(.bar)
+            Divider()
+
+            switch sidebarMode {
+            case .files:
+                fileBrowser
+            case .git:
+                ProjectGitWorkbenchView(
+                    viewModel: gitViewModel,
+                    onOpenFile: { change in
+                        sidebarMode = .files
+                        Task { await viewModel.openGitChange(change) }
+                    }
+                )
+            }
+        }
+        .workspaceFill()
+    }
+
+    @ViewBuilder
+    private var editor: some View {
+        if sidebarMode == .git, let diff = gitViewModel.selectedDiff {
+            ProjectGitDiffView(
+                diff: diff,
+                onClose: { gitViewModel.clearDiff() },
+                onOpenFile: {
+                    guard let change = gitViewModel.snapshot.changes.first(where: {
+                        $0.path == diff.path
+                    }) else { return }
+                    sidebarMode = .files
+                    Task { await viewModel.openGitChange(change) }
+                }
+            )
+        } else {
+            ProjectFileEditorView(viewModel: viewModel)
+        }
+    }
+
+    private var fileBrowser: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                TextField("搜索项目文件", text: $viewModel.searchText)
+                TextField(
+                    model.localized("搜索项目文件", english: "Search project files"),
+                    text: $viewModel.searchText
+                )
                     .textFieldStyle(.roundedBorder)
                 Menu {
-                    Button("新建文件", systemImage: "doc.badge.plus") { createKind = .file }
-                    Button("新建文件夹", systemImage: "folder.badge.plus") { createKind = .directory }
+                    Button(model.localized("新建文件", english: "New File"), systemImage: "doc.badge.plus") {
+                        createKind = .file
+                    }
+                    Button(model.localized("新建文件夹", english: "New Folder"), systemImage: "folder.badge.plus") {
+                        createKind = .directory
+                    }
                 } label: { Image(systemName: "plus") }
                     .menuStyle(.borderlessButton)
                 Button { Task { await viewModel.refresh() } } label: { Image(systemName: "arrow.clockwise") }
                     .buttonStyle(.plain)
-                    .help("刷新")
+                    .help(model.localized("刷新", english: "Refresh"))
             }
             .padding(12)
             Divider()
             if viewModel.rootPath == nil {
-                ContentUnavailableView("没有项目目录", systemImage: "folder.badge.questionmark", description: Text("请先为项目连接本机目录。"))
+                ContentUnavailableView(
+                    model.localized("没有项目目录", english: "No project directory"),
+                    systemImage: "folder.badge.questionmark",
+                    description: Text(model.localized(
+                        "请先为项目连接本机目录。",
+                        english: "Connect a local directory to this project first."
+                    ))
+                )
                     .workspaceFill()
             } else if !viewModel.searchText.isEmpty {
                 searchResults
@@ -66,6 +144,10 @@ struct ProjectDirectoryView: View {
         }
         .workspaceFill()
         .background(AppPalette.canvas)
+    }
+
+    private var gitTabTitle: String {
+        gitViewModel.changeCount > 0 ? "Git \(gitViewModel.changeCount)" : "Git"
     }
 
     private var tree: some View {
@@ -86,7 +168,7 @@ struct ProjectDirectoryView: View {
     private var searchResults: some View {
         List {
             if !viewModel.contentSearchResults.isEmpty {
-                Section("文件内容") {
+                Section(model.localized("文件内容", english: "File Contents")) {
                     ForEach(viewModel.contentSearchResults) { match in
                         Button {
                             Task { await viewModel.selectContentSearchResult(match) }
@@ -98,7 +180,10 @@ struct ProjectDirectoryView: View {
                                     Text(URL(fileURLWithPath: match.path).lastPathComponent)
                                         .appFont(.subheadline.weight(.semibold))
                                     Spacer()
-                                    Text("第 \(match.line) 行")
+                                    Text(model.localized(
+                                        "第 \(match.line) 行",
+                                        english: "Line \(match.line)"
+                                    ))
                                         .appFont(.caption2.monospacedDigit())
                                         .foregroundStyle(AppPalette.ai)
                                 }
@@ -119,7 +204,7 @@ struct ProjectDirectoryView: View {
             }
 
             if !viewModel.searchResults.isEmpty {
-                Section("文件和目录") {
+                Section(model.localized("文件和目录", english: "Files and Folders")) {
                     ForEach(viewModel.searchResults) { entry in
                         Button { Task { await viewModel.selectSearchResult(entry) } } label: {
                             VStack(alignment: .leading, spacing: 3) {
@@ -141,7 +226,10 @@ struct ProjectDirectoryView: View {
         .background(AppPalette.canvas)
         .overlay {
             if viewModel.isSearching {
-                ProgressView("正在搜索文件内容…")
+                ProgressView(model.localized(
+                    "正在搜索文件内容…",
+                    english: "Searching file contents…"
+                ))
                     .padding(16)
                     .background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 10))
                     .overlay { RoundedRectangle(cornerRadius: 10).stroke(AppPalette.border.opacity(0.8)) }
@@ -153,13 +241,24 @@ struct ProjectDirectoryView: View {
 
     private func createSheet(_ kind: CreateKind) -> some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text(kind == .file ? "新建文件" : "新建文件夹").appFont(.title2.weight(.semibold))
-            TextField(kind == .file ? "例如 README.md" : "文件夹名称", text: $createName)
+            Text(kind == .file
+                 ? model.localized("新建文件", english: "New File")
+                 : model.localized("新建文件夹", english: "New Folder"))
+                .appFont(.title2.weight(.semibold))
+            TextField(
+                kind == .file
+                    ? model.localized("例如 README.md", english: "For example, README.md")
+                    : model.localized("文件夹名称", english: "Folder name"),
+                text: $createName
+            )
                 .textFieldStyle(.roundedBorder)
             HStack {
                 Spacer()
-                Button("取消") { createKind = nil; createName = "" }
-                Button("创建") {
+                Button(model.localized("取消", english: "Cancel")) {
+                    createKind = nil
+                    createName = ""
+                }
+                Button(model.localized("创建", english: "Create")) {
                     let name = createName.trimmingCharacters(in: .whitespacesAndNewlines)
                     createKind = nil
                     createName = ""
@@ -179,6 +278,11 @@ struct ProjectDirectoryView: View {
 }
 
 private enum CreateKind: String, Identifiable { case file, directory; var id: String { rawValue } }
+
+private enum ProjectDirectorySidebarMode: String, Hashable {
+    case files
+    case git
+}
 
 private struct ProjectFileTreeRow: View {
     let item: ProjectDirectoryViewModel.VisibleEntry

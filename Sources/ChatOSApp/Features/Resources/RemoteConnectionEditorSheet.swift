@@ -8,14 +8,12 @@ struct RemoteConnectionEditorSheetHost: View {
     init(
         editingConnection: RemoteConnection?,
         connections: [RemoteConnection],
-        connectorStatus: LocalConnectorStatus?,
         service: any RemoteConnectionServicing,
         onSaved: @escaping (RemoteConnection) -> Void
     ) {
         _viewModel = StateObject(wrappedValue: RemoteConnectionEditorViewModel(
             editingConnection: editingConnection,
             connections: connections,
-            connectorStatus: connectorStatus,
             service: service
         ))
         self.onSaved = onSaved
@@ -28,6 +26,7 @@ struct RemoteConnectionEditorSheetHost: View {
 
 private struct RemoteConnectionEditorSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var model: AppModel
     @ObservedObject var viewModel: RemoteConnectionEditorViewModel
     let onSaved: (RemoteConnection) -> Void
 
@@ -37,7 +36,6 @@ private struct RemoteConnectionEditorSheet: View {
             Divider()
             Form {
                 RemoteConnectionBasicsSection(viewModel: viewModel)
-                RemoteConnectionExecutionSection(viewModel: viewModel)
                 RemoteConnectionAuthenticationSection(viewModel: viewModel)
                 RemoteConnectionJumpSection(viewModel: viewModel)
                 feedback
@@ -48,6 +46,7 @@ private struct RemoteConnectionEditorSheet: View {
             footer
         }
         .frame(minWidth: 700, idealWidth: 760, minHeight: 680, idealHeight: 760)
+        .environment(\.locale, model.interfaceLocale)
         .sheet(isPresented: verificationPresented) {
             verificationSheet
         }
@@ -61,8 +60,11 @@ private struct RemoteConnectionEditorSheet: View {
                 .frame(width: 36, height: 36)
                 .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 9))
             VStack(alignment: .leading, spacing: 2) {
-                Text(viewModel.title).appFont(.title3.weight(.semibold))
-                Text("连接由本机网关执行，凭据不会展示在界面中。")
+                Text(viewModel.editingConnection == nil
+                     ? model.localized("新建远端连接", english: "New Remote Connection")
+                     : model.localized("编辑远端连接", english: "Edit Remote Connection"))
+                    .appFont(.title3.weight(.semibold))
+                Text("SSH 由 ChatOS 客户端直接执行，凭据只保存在这台 Mac。")
                     .appFont(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -75,14 +77,14 @@ private struct RemoteConnectionEditorSheet: View {
     private var feedback: some View {
         if let successMessage = viewModel.successMessage {
             Section {
-                Label(successMessage, systemImage: "checkmark.circle.fill")
+                Label(localizedFeedback(successMessage), systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
             }
         }
         if let errorMessage = viewModel.errorMessage {
             Section {
                 Label {
-                    Text(errorMessage).fixedSize(horizontal: false, vertical: true)
+                    Text(localizedFeedback(errorMessage)).fixedSize(horizontal: false, vertical: true)
                 } icon: {
                     Image(systemName: "exclamationmark.triangle.fill")
                 }
@@ -108,7 +110,9 @@ private struct RemoteConnectionEditorSheet: View {
             Button("取消") { dismiss() }
                 .keyboardShortcut(.cancelAction)
                 .disabled(viewModel.isBusy)
-            Button(viewModel.editingConnection == nil ? "创建" : "保存") {
+            Button(viewModel.editingConnection == nil
+                   ? model.localized("创建", english: "Create")
+                   : model.localized("保存", english: "Save")) {
                 Task {
                     if let connection = await viewModel.save() {
                         onSaved(connection)
@@ -133,7 +137,8 @@ private struct RemoteConnectionEditorSheet: View {
     private var verificationSheet: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("SSH 二次验证").appFont(.title3.weight(.semibold))
-            Text(viewModel.verificationPrompt ?? "请输入服务器要求的验证码。")
+            Text(viewModel.verificationPrompt
+                 ?? model.localized("请输入服务器要求的验证码。", english: "Enter the verification code requested by the server."))
                 .appFont(.body)
                 .foregroundStyle(.secondary)
             TextField("验证码", text: $viewModel.verificationCode)
@@ -151,5 +156,15 @@ private struct RemoteConnectionEditorSheet: View {
         }
         .padding(22)
         .frame(width: 440)
+    }
+
+    private func localizedFeedback(_ message: String) -> String {
+        switch message {
+        case "连接测试成功。": model.localized("连接测试成功。", english: "Connection test succeeded.")
+        case "二次验证通过，连接测试成功。": model.localized("二次验证通过，连接测试成功。", english: "Verification passed and the connection test succeeded.")
+        case "请输入验证码。": model.localized("请输入验证码。", english: "Enter the verification code.")
+        case "验证码未通过，请重新输入。": model.localized("验证码未通过，请重新输入。", english: "The verification code was rejected. Try again.")
+        default: message
+        }
     }
 }

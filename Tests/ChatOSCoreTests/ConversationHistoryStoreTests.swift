@@ -304,6 +304,60 @@ final class ConversationHistoryStoreTests: XCTestCase {
         XCTAssertEqual(snapshot.unreadNewerCount, 1)
     }
 
+    func testLatestPageUpdateCreatesUnreadWhenViewportIsNotPinned() async {
+        let store = ConversationHistoryStore()
+        await store.mergeCachedTurns(
+            [turn(id: "1", sequence: 1, revision: 1)],
+            sessionID: "session-a"
+        )
+        await store.setViewportAnchor(
+            ViewportAnchor(turnID: "1", relativeOffset: 0, isPinnedToBottom: false),
+            sessionID: "session-a"
+        )
+
+        await store.mergePage(
+            HistoryPage(
+                turns: [turn(id: "1", sequence: 1, revision: 2)],
+                olderCursor: nil,
+                hasOlder: false,
+                snapshotRevision: 2,
+                requestGeneration: 1
+            ),
+            sessionID: "session-a",
+            origin: .latest
+        )
+
+        let snapshot = await store.snapshot(sessionID: "session-a")
+        XCTAssertEqual(snapshot.unreadNewerCount, 1)
+    }
+
+    func testLatestPageUpdateStaysReadWhenViewportIsPinned() async {
+        let store = ConversationHistoryStore()
+        await store.mergeCachedTurns(
+            [turn(id: "1", sequence: 1, revision: 1)],
+            sessionID: "session-a"
+        )
+        await store.setViewportAnchor(
+            ViewportAnchor(turnID: "1", relativeOffset: 0, isPinnedToBottom: true),
+            sessionID: "session-a"
+        )
+
+        await store.mergePage(
+            HistoryPage(
+                turns: [turn(id: "1", sequence: 1, revision: 2)],
+                olderCursor: nil,
+                hasOlder: false,
+                snapshotRevision: 2,
+                requestGeneration: 1
+            ),
+            sessionID: "session-a",
+            origin: .latest
+        )
+
+        let snapshot = await store.snapshot(sessionID: "session-a")
+        XCTAssertEqual(snapshot.unreadNewerCount, 0)
+    }
+
     func testEqualRevisionCannotOverwriteAcceptedTurn() async {
         let store = ConversationHistoryStore()
         await store.mergeCachedTurns(

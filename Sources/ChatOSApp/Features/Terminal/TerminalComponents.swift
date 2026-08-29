@@ -1,29 +1,80 @@
 import SwiftUI
 
 struct TerminalTabsView: View {
+    let sessions: [TerminalWorkspaceViewModel.Session]
+    let selectedSessionID: UUID?
+    let onSelect: (UUID) -> Void
+    let onClose: (UUID) -> Void
+    let onAdd: () -> Void
+
     var body: some View {
         HStack(spacing: 8) {
-            HStack(spacing: 8) {
-                Circle().fill(.green).frame(width: 7, height: 7)
-                Text("test_project").appFont(.subheadline.weight(.medium))
-                Button("关闭", systemImage: "xmark") {}
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
-            .overlay { RoundedRectangle(cornerRadius: 8).stroke(.separator, lineWidth: 1) }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(sessions) { session in
+                        terminalTab(session)
+                    }
 
-            Button("新建终端", systemImage: "plus") {}
-                .labelStyle(.iconOnly)
-                .buttonStyle(.plain)
+                    Button("新建终端", systemImage: "plus", action: onAdd)
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(.plain)
+                        .help("新建终端")
+                }
+            }
+
             Spacer()
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
         .background(AppPalette.surfaceSubtle)
+    }
+
+    private func terminalTab(_ session: TerminalWorkspaceViewModel.Session) -> some View {
+        HStack(spacing: 7) {
+            Button {
+                onSelect(session.id)
+            } label: {
+                HStack(spacing: 7) {
+                    Circle().fill(.green).frame(width: 7, height: 7)
+                    Text(session.title)
+                        .appFont(.subheadline.weight(.medium))
+                        .lineLimit(1)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                onClose(session.id)
+            } label: {
+                Image(systemName: "xmark")
+                    .appFont(.system(size: 10, weight: .semibold))
+                    .frame(width: 18, height: 18)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .help("关闭终端")
+        }
+        .padding(.leading, 11)
+        .padding(.trailing, 7)
+        .padding(.vertical, 7)
+        .background(tabBackground(for: session.id), in: RoundedRectangle(cornerRadius: 8))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(
+                    session.id == selectedSessionID
+                        ? Color.accentColor.opacity(0.45)
+                        : Color(nsColor: .separatorColor),
+                    lineWidth: 1
+                )
+        }
+    }
+
+    private func tabBackground(for id: UUID) -> Color {
+        id == selectedSessionID
+            ? Color(nsColor: .windowBackgroundColor)
+            : Color(nsColor: .controlBackgroundColor).opacity(0.55)
     }
 }
 
@@ -37,34 +88,11 @@ struct TerminalHeaderView: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
             Spacer()
-            Circle().fill(.green).frame(width: 7, height: 7)
-            Text("已连接").appFont(.caption).foregroundStyle(.secondary)
             StatusCapsule(title: "zsh", color: .secondary)
         }
         .padding(.horizontal, 18)
         .frame(height: 48)
         .background(AppPalette.canvas)
-    }
-}
-
-struct TerminalStatusBar: View {
-    @ObservedObject var terminal: TerminalViewModel
-
-    var body: some View {
-        HStack(spacing: 16) {
-            Label("已连接", systemImage: "circle.fill")
-                .foregroundStyle(.secondary, .green)
-            Text("Local Connector")
-            Text("zsh")
-            Text("UTF-8")
-            Spacer()
-            Text(terminal.isRunning ? "命令运行中" : "就绪")
-        }
-        .appFont(.caption2)
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 14)
-        .frame(height: 28)
-        .background(AppPalette.surfaceSubtle)
     }
 }
 

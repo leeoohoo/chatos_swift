@@ -4,6 +4,28 @@ import XCTest
 @testable import ChatOSAPI
 
 final class ChatOSProjectExecutionServiceTests: XCTestCase {
+    func testFetchExecutionUsesPreciseIdentityAndDecodesFailureReason() async throws {
+        let transport = ProjectExecutionTransport()
+        let service = makeService(transport: transport)
+
+        let fetched = try await service.fetchExecution(identity)
+        let launch = try XCTUnwrap(fetched)
+
+        let capturedRequest = await transport.lastRequest()
+        let request = try XCTUnwrap(capturedRequest)
+        let components = try XCTUnwrap(URLComponents(url: request.url, resolvingAgainstBaseURL: false))
+        XCTAssertEqual(
+            components.percentEncodedPath,
+            "/api/chatos/projects/project%201/requirements/requirement%2F1/execution-plan"
+        )
+        XCTAssertEqual(
+            Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value) })["conversation_id"]!,
+            "conversation-1"
+        )
+        XCTAssertEqual(launch.overallStatus, "failed")
+        XCTAssertEqual(launch.failureReason, "规划 Agent 调用失败")
+    }
+
     func testConfirmUsesExactGatewayPathAndBody() async throws {
         let transport = ProjectExecutionTransport()
         let service = makeService(transport: transport)
@@ -67,7 +89,9 @@ private actor ProjectExecutionTransport: HTTPTransport {
 
     func send(_ request: HTTPRequest) async throws -> HTTPResponse {
         self.request = request
-        let body = #"{"success":true,"status":"accepted","execution_group_id":"group-1"}"#
+        let body = request.url.path.hasSuffix("/execution-plan")
+            ? #"{"found":true,"project_id":"project 1","requirement_id":"requirement/1","conversation_id":"conversation-1","execution_group_id":"group-1","message_id":"group-1","status":"failed","confirmation_status":"failed","has_started_runs":false,"failure_kind":"planner_failed","failure_reason":"规划 Agent 调用失败"}"#
+            : #"{"success":true,"status":"accepted","execution_group_id":"group-1"}"#
         return HTTPResponse(statusCode: 200, headers: [:], body: Data(body.utf8))
     }
 

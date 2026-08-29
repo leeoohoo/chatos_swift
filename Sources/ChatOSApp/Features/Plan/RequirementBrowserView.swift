@@ -196,7 +196,7 @@ private struct PlanStat: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(title).appFont(.caption2).foregroundStyle(.secondary)
+            Text(LocalizedStringKey(title)).appFont(.caption2).foregroundStyle(.secondary)
             Text("\(value)").appFont(.subheadline.weight(.semibold)).foregroundStyle(color)
         }
         .padding(.horizontal, 10)
@@ -211,7 +211,7 @@ struct PlanStatusBadge: View {
     let status: String
 
     var body: some View {
-        Text(title)
+        Text(LocalizedStringKey(title))
             .appFont(.caption2.weight(.medium))
             .foregroundStyle(color)
             .padding(.horizontal, 6)

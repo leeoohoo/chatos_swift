@@ -166,6 +166,8 @@ public struct ProjectRequirementExecutionLaunch: Sendable, Equatable {
     public var contactID: String?
     public var taskCount: Int
     public var includePrerequisiteDependents: Bool
+    public var failureKind: String?
+    public var failureReason: String?
     public var createdAt: Date?
 
     public init(
@@ -180,6 +182,8 @@ public struct ProjectRequirementExecutionLaunch: Sendable, Equatable {
         contactID: String? = nil,
         taskCount: Int = 0,
         includePrerequisiteDependents: Bool = false,
+        failureKind: String? = nil,
+        failureReason: String? = nil,
         createdAt: Date? = nil
     ) {
         self.projectID = projectID
@@ -193,6 +197,8 @@ public struct ProjectRequirementExecutionLaunch: Sendable, Equatable {
         self.contactID = contactID
         self.taskCount = taskCount
         self.includePrerequisiteDependents = includePrerequisiteDependents
+        self.failureKind = failureKind
+        self.failureReason = failureReason
         self.createdAt = createdAt
     }
 }

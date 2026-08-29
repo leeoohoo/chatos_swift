@@ -8,6 +8,31 @@ public struct ChatOSProjectExecutionService: ProjectExecutionServicing {
         self.client = client
     }
 
+    public func fetchExecution(
+        _ identity: ProjectExecutionIdentity
+    ) async throws -> ProjectRequirementExecutionLaunch? {
+        var components = URLComponents()
+        components.percentEncodedPath = "/projects/\(identity.projectID.urlPathEncoded)/requirements/\(identity.requirementID.urlPathEncoded)/execution-plan"
+        components.queryItems = [
+            URLQueryItem(name: "conversation_id", value: identity.conversationID),
+            URLQueryItem(name: "execution_group_id", value: identity.executionGroupID),
+        ]
+        let response: ProjectRequirementExecutionDTO = try await client.request(
+            components.string ?? components.path
+        )
+        guard response.found != false,
+              let conversationID = response.conversationID?.trimmedNonEmptyValue,
+              let executionGroupID = response.executionGroupID?.trimmedNonEmptyValue else {
+            return nil
+        }
+        return response.domainModel(
+            fallbackProjectID: identity.projectID,
+            fallbackRequirementID: identity.requirementID,
+            conversationID: conversationID,
+            executionGroupID: executionGroupID
+        )
+    }
+
     public func confirmExecution(
         _ identity: ProjectExecutionIdentity
     ) async throws -> ProjectExecutionActionResult {

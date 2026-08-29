@@ -9,9 +9,25 @@ extension NativeLocalConnectorService {
             let id = source.catalog.id
             let installedRecord = state.installedPluginRecords?[id]
             let installed = installedRecord != nil || state.installedPluginIDs.contains(id)
+            let installedManifest: NativePluginManifest?
+            let permissions: [LocalConnectorPluginPermission]
+            if let installedRecord,
+               let manifest = try? installedPluginManifest(record: installedRecord) {
+                installedManifest = manifest
+                permissions = NativePluginPermissionInspector.permissions(
+                    record: installedRecord,
+                    manifest: manifest
+                )
+            } else {
+                installedManifest = nil
+                permissions = []
+            }
             return .init(
                 pluginID: id,
-                displayName: source.catalog.displayName ?? source.catalog.name ?? id,
+                displayName: installedManifest?.interface?.displayName
+                    ?? source.catalog.displayName
+                    ?? source.catalog.name
+                    ?? id,
                 description: source.catalog.description ?? "",
                 category: source.catalog.interface?.category ?? "Plugin",
                 publisher: source.catalog.publisher?.name
@@ -22,7 +38,8 @@ extension NativeLocalConnectorService {
                 updateAvailable: installedRecord.map { $0.version != source.release.version } ?? false,
                 installAvailable: source.release.artifactSHA256 != nil
                     && source.release.npmPackage != nil,
-                enabled: state.pluginPreferences[id] ?? source.preference?.enabled ?? true
+                enabled: state.pluginPreferences[id] ?? source.preference?.enabled ?? true,
+                permissions: permissions
             )
         }
     }
@@ -62,5 +79,43 @@ extension NativeLocalConnectorService {
         state.pluginPreferences[id] = enabled
         try stateStore.save(state)
         try? await publishPluginInstallationStatus()
+    }
+
+    public func requestPluginPermission(pluginID: String, permissionID: String) async throws {
+        guard let record = state.installedPluginRecords?[pluginID] else {
+            throw NativeConnectorError.pluginInstallation("Plugin 尚未安装")
+        }
+        let manifest = try installedPluginManifest(record: record)
+        if try NativePluginPermissionInspector.request(
+            record: record,
+            manifest: manifest,
+            permissionID: permissionID
+        ) {
+            return
+        }
+        let nativePermissionID: String
+        switch permissionID {
+        case "computer.accessibility": nativePermissionID = "accessibility"
+        case "computer.screen-recording": nativePermissionID = "screen_recording"
+        default:
+            throw NativeConnectorError.pluginInstallation("这个权限不需要系统设置")
+        }
+        await MainActor.run { NativeSystemPermissions.request(nativePermissionID) }
+    }
+
+    private func installedPluginManifest(
+        record: NativeInstalledPluginRecord
+    ) throws -> NativePluginManifest {
+        let url = URL(fileURLWithPath: record.installationPath, isDirectory: true)
+            .appendingPathComponent("chatos.plugin.json")
+        let manifest = try JSONDecoder().decode(
+            NativePluginManifest.self,
+            from: Data(contentsOf: url, options: .mappedIfSafe)
+        )
+        guard manifest.name.isEmpty == false,
+              manifest.version == record.version else {
+            throw NativeConnectorError.pluginInstallation("Plugin 权限清单与安装记录不一致")
+        }
+        return manifest
     }
 }

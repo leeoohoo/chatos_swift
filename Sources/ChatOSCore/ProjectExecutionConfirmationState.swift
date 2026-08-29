@@ -31,7 +31,7 @@ public struct ProjectExecutionConfirmationState: Sendable, Equatable {
     ) {
         let tasks = graph?.nodes.map(\.task) ?? []
         let statuses = tasks.map { task in
-            Self.normalized(task.lastRunStatus) ?? Self.normalized(task.status) ?? ""
+            Self.normalized(task.status) ?? Self.normalized(task.lastRunStatus) ?? ""
         }
         let hasStartedTasks = tasks.contains { Self.nonEmpty($0.lastRunID) != nil }
         let ready = !tasks.isEmpty && tasks.allSatisfy { task in
@@ -45,13 +45,31 @@ public struct ProjectExecutionConfirmationState: Sendable, Equatable {
         let terminalPlanStatuses = [
             "completed", "failed", "error", "blocked", "stopped", "cancelled", "canceled",
         ]
+        let runningPlanStatuses = [
+            "confirmed", "processing", "running", "executing", "in_progress",
+        ]
+        let planningPlanStatuses = ["planning", "planning_started"]
         let explicitlyAwaiting = metadataStatus == "awaiting_confirmation"
         let awaiting = !hasStartedTasks
+            && !runningPlanStatuses.contains(metadataStatus)
+            && !planningPlanStatuses.contains(metadataStatus)
             && (explicitlyAwaiting || (ready && !terminalPlanStatuses.contains(metadataStatus)))
         let startedStatus = Self.startedStatus(statuses)
-        let overallStatus = awaiting
-            ? "awaiting_confirmation"
-            : startedStatus ?? metadataStatus
+        let overallStatus: String
+        if awaiting {
+            overallStatus = "awaiting_confirmation"
+        } else if terminalPlanStatuses.contains(metadataStatus) {
+            overallStatus = metadataStatus
+        } else if hasStartedTasks, let startedStatus {
+            // Once graph nodes have started, their current task status is more
+            // authoritative than lagging execution-group metadata.
+            overallStatus = startedStatus
+        } else if runningPlanStatuses.contains(metadataStatus)
+                    || planningPlanStatuses.contains(metadataStatus) {
+            overallStatus = metadataStatus
+        } else {
+            overallStatus = startedStatus ?? metadataStatus
+        }
 
         self.isProjectExecution = context?.isProjectExecution == true
         self.graphReadyForConfirmation = ready
@@ -111,7 +129,10 @@ public struct ProjectExecutionConfirmationState: Sendable, Equatable {
         if ["failed", "error", "cancelled", "canceled"].contains(status) { return .failed }
         if status == "completed" { return .completed }
         if awaiting && graphReady { return .awaitingConfirmation }
-        if hasStartedTasks { return .running }
+        if hasStartedTasks
+            || ["confirmed", "processing", "running", "executing", "in_progress"].contains(status) {
+            return .running
+        }
         return .planning
     }
 

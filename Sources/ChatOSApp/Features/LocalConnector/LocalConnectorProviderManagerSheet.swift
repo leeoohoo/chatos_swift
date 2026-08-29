@@ -3,6 +3,7 @@ import SwiftUI
 
 struct LocalConnectorProviderManagerSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var appModel: AppModel
     @ObservedObject var viewModel: LocalConnectorControlCenterViewModel
     @State private var editingProvider: LocalConnectorModelProvider?
     @State private var isCreating = false
@@ -25,44 +26,62 @@ struct LocalConnectorProviderManagerSheet: View {
         }
         .frame(minWidth: 720, minHeight: 560)
         .confirmationDialog(
-            "删除供应商？",
+            appModel.localized("删除供应商？", english: "Delete provider?"),
             isPresented: Binding(
                 get: { pendingDeletion != nil },
                 set: { if !$0 { pendingDeletion = nil } }
             ),
             presenting: pendingDeletion
         ) { provider in
-            Button("删除 \(provider.name)", role: .destructive) {
+            Button(appModel.localized(
+                "删除 \(provider.name)",
+                english: "Delete \(provider.name)"
+            ), role: .destructive) {
                 viewModel.deleteModelProvider(id: provider.id)
                 pendingDeletion = nil
             }
         } message: { provider in
-            Text("这会同时删除由 \(provider.name) 导入的模型配置。")
+            Text(appModel.localized(
+                "这会同时删除由 \(provider.name) 导入的模型配置。",
+                english: "This also deletes model configurations imported from \(provider.name)."
+            ))
         }
     }
 
     private var header: some View {
         HStack(spacing: 12) {
             if isCreating || editingProvider != nil {
-                Button("返回", systemImage: "chevron.left", action: closeEditor)
+                Button(appModel.localized("返回", english: "Back"), systemImage: "chevron.left", action: closeEditor)
                     .labelStyle(.iconOnly)
             }
             VStack(alignment: .leading, spacing: 3) {
-                Text(isCreating ? "添加供应商" : editingProvider == nil ? "模型供应商" : "修改供应商")
+                Text(isCreating
+                     ? appModel.localized("添加供应商", english: "Add Provider")
+                     : editingProvider == nil
+                        ? appModel.localized("模型供应商", english: "Model Providers")
+                        : appModel.localized("修改供应商", english: "Edit Provider"))
                     .appFont(.title2.weight(.semibold))
                 Text(isCreating || editingProvider != nil
-                     ? "保存供应商连接信息和模型能力。"
-                     : "供应商负责凭据、Base URL 和模型目录同步。")
+                     ? appModel.localized(
+                        "保存供应商连接信息和模型能力。",
+                        english: "Save provider connection details and model capabilities."
+                     )
+                     : appModel.localized(
+                        "供应商负责凭据、Base URL 和模型目录同步。",
+                        english: "Providers manage credentials, Base URLs, and model catalog sync."
+                     ))
                     .appFont(.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer()
             if viewModel.isPerformingAction { ProgressView().controlSize(.small) }
             if !isCreating && editingProvider == nil {
-                Button("添加供应商", systemImage: "plus") { isCreating = true }
+                Button(appModel.localized("添加供应商", english: "Add Provider"), systemImage: "plus") {
+                    isCreating = true
+                }
                     .buttonStyle(.borderedProminent)
             }
-            Button("关闭", systemImage: "xmark", action: dismiss.callAsFunction)
+            Button(appModel.localized("关闭", english: "Close"), systemImage: "xmark", action: dismiss.callAsFunction)
                 .labelStyle(.iconOnly)
         }
         .padding(20)
@@ -72,9 +91,12 @@ struct LocalConnectorProviderManagerSheet: View {
         Group {
             if viewModel.modelProviders.isEmpty {
                 ContentUnavailableView(
-                    "还没有模型供应商",
+                    appModel.localized("还没有模型供应商", english: "No model providers yet"),
                     systemImage: "server.rack",
-                    description: Text("添加供应商后，刷新目录即可导入可用模型。")
+                    description: Text(appModel.localized(
+                        "添加供应商后，刷新目录即可导入可用模型。",
+                        english: "Add a provider, then refresh its catalog to import available models."
+                    ))
                 )
             } else {
                 ScrollView {
@@ -99,8 +121,18 @@ struct LocalConnectorProviderManagerSheet: View {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 8) {
                         Text(provider.name).appFont(.headline)
-                        statusBadge(provider.enabled ? "已启用" : "已停用", color: provider.enabled ? .green : .secondary)
-                        statusBadge(provider.hasAPIKey ? "凭据已保存" : "缺少凭据", color: provider.hasAPIKey ? .green : .orange)
+                        statusBadge(
+                            provider.enabled
+                                ? appModel.localized("已启用", english: "Enabled")
+                                : appModel.localized("已停用", english: "Disabled"),
+                            color: provider.enabled ? .green : .secondary
+                        )
+                        statusBadge(
+                            provider.hasAPIKey
+                                ? appModel.localized("凭据已保存", english: "Credentials saved")
+                                : appModel.localized("缺少凭据", english: "Missing credentials"),
+                            color: provider.hasAPIKey ? .green : .orange
+                        )
                     }
                     Text("\(provider.provider) · Prompt: \(provider.promptVendor)")
                         .appFont(.caption)
@@ -111,7 +143,10 @@ struct LocalConnectorProviderManagerSheet: View {
                         .textSelection(.enabled)
                 }
                 Spacer()
-                Text("\(provider.importedModelCount) 个模型")
+                Text(appModel.localized(
+                    "\(provider.importedModelCount) 个模型",
+                    english: "\(provider.importedModelCount) models"
+                ))
                     .appFont(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
@@ -122,15 +157,15 @@ struct LocalConnectorProviderManagerSheet: View {
                     .textSelection(.enabled)
             }
             HStack {
-                capabilityBadge("图片", enabled: provider.supportsImages)
-                capabilityBadge("推理", enabled: provider.supportsReasoning)
+                capabilityBadge(appModel.localized("图片", english: "Images"), enabled: provider.supportsImages)
+                capabilityBadge(appModel.localized("推理", english: "Reasoning"), enabled: provider.supportsReasoning)
                 capabilityBadge("Responses", enabled: provider.supportsResponses)
                 Spacer()
-                Button("刷新模型", systemImage: "arrow.triangle.2.circlepath") {
+                Button(appModel.localized("刷新模型", english: "Refresh Models"), systemImage: "arrow.triangle.2.circlepath") {
                     viewModel.refreshModelProvider(id: provider.id)
                 }
-                Button("修改", systemImage: "pencil") { editingProvider = provider }
-                Button("删除", systemImage: "trash", role: .destructive) {
+                Button(appModel.localized("修改", english: "Edit"), systemImage: "pencil") { editingProvider = provider }
+                Button(appModel.localized("删除", english: "Delete"), systemImage: "trash", role: .destructive) {
                     pendingDeletion = provider
                 }
             }
@@ -172,6 +207,7 @@ struct LocalConnectorProviderManagerSheet: View {
 }
 
 private struct LocalConnectorProviderEditor: View {
+    @EnvironmentObject private var appModel: AppModel
     var provider: LocalConnectorModelProvider?
     var disabled: Bool
     var onCancel: () -> Void
@@ -220,13 +256,13 @@ private struct LocalConnectorProviderEditor: View {
                         .appFont(.callout)
                         .foregroundStyle(.orange)
                 }
-                GroupBox("连接信息") {
+                GroupBox(appModel.localized("连接信息", english: "Connection")) {
                     Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 14) {
-                        editorRow("名称") {
-                            TextField("例如：OpenAI Production", text: $name)
+                        editorRow(appModel.localized("名称", english: "Name")) {
+                            TextField(appModel.localized("例如：OpenAI Production", english: "For example: OpenAI Production"), text: $name)
                         }
-                        editorRow("供应商协议") {
-                            Picker("供应商协议", selection: $providerType) {
+                        editorRow(appModel.localized("供应商协议", english: "Provider protocol")) {
+                            Picker(appModel.localized("供应商协议", english: "Provider protocol"), selection: $providerType) {
                                 ForEach(providerOptions, id: \.self, content: Text.init)
                             }
                             .labelsHidden()
@@ -234,8 +270,8 @@ private struct LocalConnectorProviderEditor: View {
                                 promptVendor = defaultPromptVendor(next)
                             }
                         }
-                        editorRow("Prompt 模板") {
-                            Picker("Prompt 模板", selection: $promptVendor) {
+                        editorRow(appModel.localized("Prompt 模板", english: "Prompt template")) {
+                            Picker(appModel.localized("Prompt 模板", english: "Prompt template"), selection: $promptVendor) {
                                 ForEach(promptVendorOptions, id: \.self, content: Text.init)
                             }
                             .labelsHidden()
@@ -244,33 +280,46 @@ private struct LocalConnectorProviderEditor: View {
                             TextField("https://api.example.com/v1", text: $baseURL)
                         }
                         editorRow("API Key") {
-                            SecureField(provider == nil ? "必填" : "留空则保留现有密钥", text: $apiKey)
+                            SecureField(
+                                provider == nil
+                                    ? appModel.localized("必填", english: "Required")
+                                    : appModel.localized("留空则保留现有密钥", english: "Leave blank to keep the existing key"),
+                                text: $apiKey
+                            )
                                 .disabled(clearAPIKey)
                         }
                     }
                     .textFieldStyle(.roundedBorder)
                     .padding(.top, 8)
                     if provider?.hasAPIKey == true {
-                        Toggle("删除服务器中已保存的 API Key", isOn: $clearAPIKey)
+                        Toggle(appModel.localized(
+                            "删除服务器中已保存的 API Key",
+                            english: "Delete the API key saved on the server"
+                        ), isOn: $clearAPIKey)
                             .foregroundStyle(clearAPIKey ? .red : .secondary)
                             .padding(.top, 10)
                     }
                 }
 
-                GroupBox("能力与状态") {
+                GroupBox(appModel.localized("能力与状态", english: "Capabilities & Status")) {
                     VStack(alignment: .leading, spacing: 12) {
-                        Toggle("启用这个供应商", isOn: $enabled)
-                        Toggle("支持图片输入", isOn: $supportsImages)
-                        Toggle("支持推理模型", isOn: $supportsReasoning)
-                        Toggle("支持 Responses API", isOn: $supportsResponses)
+                        Toggle(appModel.localized("启用这个供应商", english: "Enable this provider"), isOn: $enabled)
+                        Toggle(appModel.localized("支持图片输入", english: "Supports image input"), isOn: $supportsImages)
+                        Toggle(appModel.localized("支持推理模型", english: "Supports reasoning models"), isOn: $supportsReasoning)
+                        Toggle(appModel.localized("支持 Responses API", english: "Supports Responses API"), isOn: $supportsResponses)
                     }
                     .padding(.top, 8)
                 }
 
                 HStack {
                     Spacer()
-                    Button("取消", action: onCancel)
-                    Button(provider == nil ? "添加供应商" : "保存修改", action: submit)
+                    Button(appModel.localized("取消", english: "Cancel"), action: onCancel)
+                    Button(
+                        provider == nil
+                            ? appModel.localized("添加供应商", english: "Add Provider")
+                            : appModel.localized("保存修改", english: "Save Changes"),
+                        action: submit
+                    )
                         .buttonStyle(.borderedProminent)
                         .disabled(disabled)
                 }
@@ -295,11 +344,17 @@ private struct LocalConnectorProviderEditor: View {
         let cleanBaseURL = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanAPIKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanName.isEmpty, URL(string: cleanBaseURL)?.scheme != nil else {
-            validationMessage = "请填写供应商名称和有效的 Base URL。"
+            validationMessage = appModel.localized(
+                "请填写供应商名称和有效的 Base URL。",
+                english: "Enter a provider name and a valid Base URL."
+            )
             return
         }
         if provider == nil && cleanAPIKey.isEmpty {
-            validationMessage = "新增供应商时必须填写 API Key。"
+            validationMessage = appModel.localized(
+                "新增供应商时必须填写 API Key。",
+                english: "An API key is required when adding a provider."
+            )
             return
         }
         validationMessage = nil

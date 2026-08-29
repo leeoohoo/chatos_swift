@@ -15,6 +15,30 @@ public struct ChatOSConversationRuntimeSettingsService: ConversationRuntimeSetti
         return response.model
     }
 
+    public func fetchAvailableModels() async throws -> [ConversationModelOption] {
+        let response: [ModelConfigDTO] = try await client.request("/ai-model-configs")
+        return response
+            .filter { $0.enabled != false && $0.modelName.trimmedNonEmptyValue != nil }
+            .map {
+                ConversationModelOption(
+                    id: $0.id,
+                    displayName: $0.name.trimmedNonEmptyValue ?? $0.modelName,
+                    modelName: $0.modelName,
+                    thinkingLevel: $0.thinkingLevel?.trimmedNonEmptyValue
+                )
+            }
+    }
+
+    public func updateModel(
+        sessionID: String,
+        modelID: String
+    ) async throws -> ConversationRuntimeSettings {
+        try await update(
+            sessionID: sessionID,
+            body: ModelUpdateDTO(selectedModelID: modelID)
+        )
+    }
+
     public func updatePlanMode(
         sessionID: String,
         enabled: Bool
@@ -39,6 +63,14 @@ public struct ChatOSConversationRuntimeSettingsService: ConversationRuntimeSetti
             body: try JSONEncoder().encode(body)
         )
         return response.model
+    }
+}
+
+private struct ModelUpdateDTO: Encodable {
+    var selectedModelID: String
+
+    enum CodingKeys: String, CodingKey {
+        case selectedModelID = "selected_model_id"
     }
 }
 

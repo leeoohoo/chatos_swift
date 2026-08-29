@@ -103,17 +103,37 @@ struct ProjectPlanDocumentsView: View {
                 }
                 .padding(16)
                 Divider()
-                ScrollView([.horizontal, .vertical]) {
-                    DocumentBody(document: document)
-                        .padding(20)
-                        .frame(maxWidth: 980, alignment: .leading)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                }
-                .workspaceFill(alignment: .topLeading)
-                .background(AppPalette.surface)
+                documentPreview(document)
             }
         } else {
             ContentUnavailableView("选择一份文档", systemImage: "doc.text")
+        }
+    }
+
+    @ViewBuilder
+    private func documentPreview(_ document: ProjectRequirementDocument) -> some View {
+        if DocumentBody.isSVG(document) {
+            ScrollView([.horizontal, .vertical]) {
+                DocumentBody(document: document)
+                    .padding(24)
+            }
+            .workspaceFill(alignment: .topLeading)
+            .background(AppPalette.surface)
+        } else {
+            ScrollView(.vertical) {
+                HStack(alignment: .top, spacing: 0) {
+                    Spacer(minLength: 0)
+                    DocumentBody(document: document)
+                        .frame(maxWidth: 1_120, alignment: .leading)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 28)
+                .padding(.top, 24)
+                .padding(.bottom, 36)
+                .frame(maxWidth: .infinity, alignment: .top)
+            }
+            .workspaceFill(alignment: .topLeading)
+            .background(AppPalette.surface)
         }
     }
 
@@ -137,7 +157,7 @@ private struct DocumentBody: View {
     let document: ProjectRequirementDocument
 
     var body: some View {
-        if isSVG, let image = NSImage(data: Data(svgMarkup.utf8)) {
+        if Self.isSVG(document), let image = NSImage(data: Data(svgMarkup.utf8)) {
             Image(nsImage: image)
                 .resizable()
                 .interpolation(.high)
@@ -151,7 +171,7 @@ private struct DocumentBody: View {
         }
     }
 
-    private var isSVG: Bool {
+    static func isSVG(_ document: ProjectRequirementDocument) -> Bool {
         document.type.lowercased().contains("svg")
             || document.format.lowercased() == "svg"
             || document.content.localizedCaseInsensitiveContains("<svg")

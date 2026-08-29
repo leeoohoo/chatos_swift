@@ -1,3 +1,5 @@
+import ChatOSCore
+
 enum SidebarSelection: Hashable {
     case contact(String)
     case project(String)
@@ -13,6 +15,16 @@ enum ProjectWorkspaceTab: String, CaseIterable, Identifiable {
     case settings = "项目设置"
 
     var id: Self { self }
+
+    func title(language: ChatOSLanguage) -> String {
+        guard language == .english else { return rawValue }
+        return switch self {
+        case .directory: "Project Files"
+        case .messages: "Messages"
+        case .plan: "Plan"
+        case .settings: "Project Settings"
+        }
+    }
 }
 
 struct ResourceItem: Identifiable, Hashable {
@@ -24,8 +36,8 @@ struct ResourceItem: Identifiable, Hashable {
 }
 
 struct VisualSessionPresentation: Equatable {
-    var ownerSessionID: String
-    var title: String
-    var targetApplication: String
+    var session: PluginVisualSession
     var isExpanded: Bool
+
+    var ownerSessionID: String { session.owner.conversationID }
 }
