@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 actor NativePluginStdioClient {
     private enum TimeoutBehavior: Sendable, Equatable {
@@ -15,11 +16,19 @@ actor NativePluginStdioClient {
     private let input: FileHandle
     private let output: FileHandle
     private let errorOutput: FileHandle
+    private var outputReaderTask: Task<Void, Never>?
+    private var errorReaderTask: Task<Void, Never>?
     private var nextRequestID = 1
     private var pending: [Int: PendingRequest] = [:]
     private var readBuffer = Data()
+    private var errorBuffer = Data()
     private var stopped = false
     private let maximumMessageBytes = 8 * 1_024 * 1_024
+    private let maximumErrorBytes = 16 * 1_024
+    private static let logger = Logger(
+        subsystem: "com.chatos.swift-client",
+        category: "NativePluginStdioClient"
+    )
 
     init(launch: NativePreparedPluginLaunch) {
         let inputPipe = Pipe()
@@ -43,13 +52,37 @@ actor NativePluginStdioClient {
 
     func start() throws {
         guard !process.isRunning else { return }
-        output.readabilityHandler = { [weak self] handle in
-            let data = handle.availableData
-            guard !data.isEmpty else { return }
-            Task { await self?.consume(data) }
+        let outputStream = AsyncStream<Data> { continuation in
+            output.readabilityHandler = { handle in
+                let data = handle.availableData
+                if data.isEmpty {
+                    continuation.finish()
+                } else {
+                    continuation.yield(data)
+                }
+            }
         }
-        errorOutput.readabilityHandler = { handle in
-            _ = handle.availableData
+        let errorStream = AsyncStream<Data> { continuation in
+            errorOutput.readabilityHandler = { handle in
+                let data = handle.availableData
+                if data.isEmpty {
+                    continuation.finish()
+                } else {
+                    continuation.yield(data)
+                }
+            }
+        }
+        outputReaderTask = Task { [weak self] in
+            for await data in outputStream {
+                guard let self else { return }
+                await self.consume(data)
+            }
+        }
+        errorReaderTask = Task { [weak self] in
+            for await data in errorStream {
+                guard let self else { return }
+                await self.consumeError(data)
+            }
         }
         process.terminationHandler = { [weak self] process in
             Task { await self?.processEnded(exitCode: process.terminationStatus) }
@@ -173,17 +206,26 @@ actor NativePluginStdioClient {
     private func consume(_ data: Data) {
         guard !stopped else { return }
         readBuffer.append(data)
-        guard readBuffer.count <= maximumMessageBytes else {
-            stop(with: NativePluginRuntimeError.invalidMCPResponse("Plugin MCP 响应超过大小限制"))
-            return
-        }
         while let newline = readBuffer.firstIndex(of: 0x0A) {
             let line = readBuffer[..<newline]
             readBuffer.removeSubrange(...newline)
-            guard !line.isEmpty,
-                  let value = try? JSONDecoder().decode(NativeJSONValue.self, from: Data(line)),
-                  let object = value.jsonObject,
+            guard !line.isEmpty else { continue }
+            guard line.count <= maximumMessageBytes else {
+                stop(with: NativePluginRuntimeError.invalidMCPResponse("Plugin MCP 响应超过大小限制"))
+                return
+            }
+            let value: NativeJSONValue
+            do {
+                value = try JSONDecoder().decode(NativeJSONValue.self, from: Data(line))
+            } catch {
+                stop(with: NativePluginRuntimeError.invalidMCPResponse(
+                    "Plugin MCP 返回了无法解析的 JSON 响应"
+                ))
+                return
+            }
+            guard let object = value.jsonObject,
                   let idNumber = object["id"]?.jsonNumber else {
+                // Valid server notifications do not have a request id.
                 continue
             }
             let id = Int(idNumber)
@@ -194,6 +236,18 @@ actor NativePluginStdioClient {
             } else {
                 request.continuation.resume(returning: object["result"] ?? .null)
             }
+        }
+        guard readBuffer.count <= maximumMessageBytes else {
+            stop(with: NativePluginRuntimeError.invalidMCPResponse("Plugin MCP 响应超过大小限制"))
+            return
+        }
+    }
+
+    private func consumeError(_ data: Data) {
+        guard !stopped, !data.isEmpty else { return }
+        errorBuffer.append(data)
+        if errorBuffer.count > maximumErrorBytes {
+            errorBuffer.removeFirst(errorBuffer.count - maximumErrorBytes)
         }
     }
 
@@ -210,6 +264,7 @@ actor NativePluginStdioClient {
         // and every later request queues behind it. Treat a hard timeout as a
         // failed process session and terminate the child so it cannot leave a
         // Task Runner run looking active for hours.
+        logPluginDiagnostics(reason: "request \(requestID) timed out")
         stop(with: NativePluginRuntimeError.timeout, terminateProcess: true)
     }
 
@@ -237,7 +292,42 @@ actor NativePluginStdioClient {
     }
 
     private func processEnded(exitCode: Int32) {
+        if exitCode != 0 {
+            logPluginDiagnostics(reason: "process exited with code \(exitCode)")
+        }
         stop(with: NativePluginRuntimeError.processExited(exitCode))
+    }
+
+    private func logPluginDiagnostics(reason: String) {
+        let tail = Self.redactedErrorTail(errorBuffer)
+        guard !tail.isEmpty else {
+            Self.logger.error("Plugin MCP \(reason, privacy: .public); stderr was empty")
+            return
+        }
+        Self.logger.error(
+            "Plugin MCP \(reason, privacy: .public); redacted stderr tail: \(tail, privacy: .public)"
+        )
+    }
+
+    private static func redactedErrorTail(_ data: Data) -> String {
+        var value = String(decoding: data, as: UTF8.self)
+            .replacingOccurrences(of: "[\\r\\n\\t]+", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "[\\x00-\\x1F\\x7F]", with: "", options: .regularExpression)
+        let sensitivePatterns = [
+            (
+                "(?i)(authorization|password|passwd|secret|token|cookie)(\\s*[:=]\\s*)([^,; ]+)",
+                "$1$2<redacted>"
+            ),
+            ("(?i)(bearer\\s+)[A-Za-z0-9._~+/=-]+", "$1<redacted>"),
+        ]
+        for (pattern, replacement) in sensitivePatterns {
+            value = value.replacingOccurrences(
+                of: pattern,
+                with: replacement,
+                options: .regularExpression
+            )
+        }
+        return String(value.trimmingCharacters(in: .whitespacesAndNewlines).suffix(2_000))
     }
 
     private func stop(with error: any Error, terminateProcess: Bool = false) {
@@ -245,6 +335,10 @@ actor NativePluginStdioClient {
         stopped = true
         output.readabilityHandler = nil
         errorOutput.readabilityHandler = nil
+        outputReaderTask?.cancel()
+        errorReaderTask?.cancel()
+        outputReaderTask = nil
+        errorReaderTask = nil
         process.terminationHandler = nil
         output.closeFile()
         errorOutput.closeFile()

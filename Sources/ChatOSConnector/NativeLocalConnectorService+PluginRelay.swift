@@ -42,10 +42,13 @@ extension NativeLocalConnectorService {
         guard ["plugin_prepare_request", "plugin_execute_request", "plugin_cancel_request"]
             .contains(request.type),
               let ownerUserID = state.user?.id,
-              let deviceID = state.deviceID,
-              let workspace = state.workspaces.first(where: { $0.id == request.workspaceID }) else {
+              let deviceID = state.deviceID else {
             throw NativePluginRuntimeError.invalidRequest("Plugin Relay 与当前设备或工作区不匹配")
         }
+        let scope = try NativePluginRelayScope.resolve(
+            workspaceID: request.workspaceID,
+            workspaces: state.workspaces
+        )
         let token = try requireAccessToken()
         let runtime = try await gateway.managedRuntimeConfig(token: token)
         try NativeRelayVerifier().verify(
@@ -57,17 +60,17 @@ extension NativeLocalConnectorService {
         )
         switch request.type {
         case "plugin_prepare_request":
-            return try await preparePlugin(request, workspace: workspace)
+            return try await preparePlugin(request, scope: scope)
         case "plugin_execute_request":
-            return try await executePlugin(request, workspace: workspace)
+            return try await executePlugin(request, scope: scope)
         default:
-            return try await cancelPlugin(request)
+            return try await cancelPlugin(request, scope: scope)
         }
     }
 
     private func preparePlugin(
         _ request: NativeRelayRequest,
-        workspace: LocalConnectorWorkspace
+        scope: NativePluginRelayScope
     ) async throws -> NativeRelayResponse {
         let body = try request.body.requireObject()
         let runID = try body.requireString("run_id")
@@ -79,11 +82,8 @@ extension NativeLocalConnectorService {
         let permissionSnapshot = Set(try body.requireStringArray("permission_snapshot"))
         let allowlist = Set(try body.optionalStringArray("tool_allowlist"))
         let blocklist = Set(try body.optionalStringArray("tool_blocklist"))
-        let projectRoot = try NativePluginProjectRootResolver.resolve(
-            rawPath: request.header("x-local-connector-project-root")
-                ?? request.header("x-local-connector-cwd"),
-            workspace: workspace
-        )
+        try scope.validate(permissionSnapshot: permissionSnapshot)
+        let projectRoot = try scope.projectRoot(for: request)
         guard state.pluginPreferences[pluginID] ?? true,
               let record = state.installedPluginRecords?[pluginID],
               record.releaseID == releaseID,
@@ -166,7 +166,8 @@ extension NativeLocalConnectorService {
                 displayName: launch.displayName,
                 visualSessionURL: launch.visualSessionURL,
                 artifactURL: launch.artifactURL,
-                projectRootURL: projectRoot
+                projectRootURL: projectRoot,
+                workspaceID: scope.workspaceID
             )
             let expiresAt = Int(Date().addingTimeInterval(7 * 24 * 60 * 60).timeIntervalSince1970)
             return .init(
@@ -208,7 +209,7 @@ extension NativeLocalConnectorService {
 
     private func executePlugin(
         _ request: NativeRelayRequest,
-        workspace: LocalConnectorWorkspace
+        scope: NativePluginRelayScope
     ) async throws -> NativeRelayResponse {
         let body = try request.body.requireObject()
         let pluginID = try body.requireString("plugin_id")
@@ -227,7 +228,8 @@ extension NativeLocalConnectorService {
             pluginID: pluginID,
             releaseID: releaseID,
             artifactSHA256: artifactSHA256,
-            componentKey: componentKey
+            componentKey: componentKey,
+            workspaceID: scope.workspaceID
         )
         if let conversationID = body["conversation_id"]?.jsonString?.nonEmptyTrimmed {
             await pluginRuntimeStore.bindOwner(
@@ -266,7 +268,9 @@ extension NativeLocalConnectorService {
             throw NativePluginRuntimeError.permissionDenied("Plugin 工具请求了尚未授权的本机权限")
         }
         if policy.approvalMode == "per_call" {
-            let projectRoot = URL(fileURLWithPath: workspace.absoluteRoot, isDirectory: true)
+            let projectRoot = try await pluginApprovalRoot(
+                adapterSessionID: adapterSessionID
+            )
             let operationSummary = Self.safeArgumentSummary(
                 toolName: toolName,
                 arguments: toolArguments
@@ -307,7 +311,7 @@ extension NativeLocalConnectorService {
             result: rawResult,
             ownerUserID: ownerUserID,
             deviceID: deviceID,
-            workspaceID: workspace.id,
+            workspaceID: scope.workspaceID,
             toolName: toolName
         )
         let result = NativePluginModelImageNormalizer.normalizeForModel(registeredResult)
@@ -330,11 +334,18 @@ extension NativeLocalConnectorService {
         )
     }
 
-    private func cancelPlugin(_ request: NativeRelayRequest) async throws -> NativeRelayResponse {
+    private func cancelPlugin(
+        _ request: NativeRelayRequest,
+        scope: NativePluginRelayScope
+    ) async throws -> NativeRelayResponse {
         let body = try request.body.requireObject()
         let runID = try body.requireString("run_id")
         let adapterSessionID = try body.requireString("adapter_session_id")
         let invocationID = body["invocation_id"]?.jsonString?.nonEmptyTrimmed
+        try await pluginRuntimeStore.validateScopeIfPresent(
+            adapterSessionID: adapterSessionID,
+            workspaceID: scope.workspaceID
+        )
         let status = await pluginRuntimeStore.cancel(
             adapterSessionID: adapterSessionID,
             invocationID: invocationID
@@ -350,6 +361,18 @@ extension NativeLocalConnectorService {
                 "status": .string(status),
             ])
         )
+    }
+
+    private func pluginApprovalRoot(adapterSessionID: String) async throws -> URL {
+        if let projectRoot = await pluginRuntimeStore.projectRootURL(
+            adapterSessionID: adapterSessionID
+        ) {
+            return projectRoot
+        }
+        let root = pluginRuntimeRootURL
+            .appendingPathComponent("device-only-approval", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        return root
     }
 
     private static func pluginResponseType(_ requestType: String?) -> String {

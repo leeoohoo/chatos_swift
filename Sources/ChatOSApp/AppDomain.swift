@@ -35,6 +35,22 @@ struct ResourceItem: Identifiable, Hashable {
     let contactName: String?
 }
 
+struct PetQuickChatResource: Identifiable, Hashable {
+    enum Kind: Hashable {
+        case contact
+        case project
+    }
+
+    let id: String
+    let sourceID: String
+    let kind: Kind
+    let title: String
+    let subtitle: String?
+    let conversationID: String?
+
+    var allowsPlanMode: Bool { kind == .project }
+}
+
 struct VisualSessionPresentation: Equatable {
     var session: PluginVisualSession
     var isExpanded: Bool

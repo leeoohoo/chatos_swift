@@ -30,7 +30,8 @@ actor NativePluginRuntimeStore {
         var displayName: String
         var visualSessionURL: URL
         var artifactURL: URL
-        var projectRootURL: URL
+        var projectRootURL: URL?
+        var workspaceID: String?
         var owner: PluginVisualSessionOwner?
         var ownerBoundAt: Date?
         var activeInvocationIDs: Set<String> = []
@@ -74,7 +75,8 @@ actor NativePluginRuntimeStore {
         displayName: String,
         visualSessionURL: URL,
         artifactURL: URL,
-        projectRootURL: URL
+        projectRootURL: URL?,
+        workspaceID: String?
     ) async {
         if let previous = sessions.removeValue(forKey: identity.adapterSessionID) {
             releaseComputerUseLease(adapterSessionID: identity.adapterSessionID)
@@ -89,7 +91,8 @@ actor NativePluginRuntimeStore {
             displayName: displayName,
             visualSessionURL: visualSessionURL,
             artifactURL: artifactURL,
-            projectRootURL: projectRootURL
+            projectRootURL: projectRootURL,
+            workspaceID: workspaceID
         )
     }
 
@@ -98,7 +101,8 @@ actor NativePluginRuntimeStore {
         pluginID: String,
         releaseID: String,
         artifactSHA256: String,
-        componentKey: String
+        componentKey: String,
+        workspaceID: String?
     ) throws -> Identity {
         guard let session = sessions[adapterSessionID] else {
             throw NativePluginRuntimeError.sessionNotFound
@@ -107,10 +111,25 @@ actor NativePluginRuntimeStore {
         guard identity.pluginID == pluginID,
               identity.releaseID == releaseID,
               identity.artifactSHA256 == artifactSHA256,
-              identity.componentKey == componentKey else {
+              identity.componentKey == componentKey,
+              session.workspaceID == workspaceID else {
             throw NativePluginRuntimeError.invalidRequest("Plugin 请求与已准备会话不匹配")
         }
         return identity
+    }
+
+    func validateScopeIfPresent(
+        adapterSessionID: String,
+        workspaceID: String?
+    ) throws {
+        guard let session = sessions[adapterSessionID] else { return }
+        guard session.workspaceID == workspaceID else {
+            throw NativePluginRuntimeError.invalidRequest("Plugin 请求与已准备会话不匹配")
+        }
+    }
+
+    func projectRootURL(adapterSessionID: String) -> URL? {
+        sessions[adapterSessionID]?.projectRootURL
     }
 
     func bindOwner(_ owner: PluginVisualSessionOwner, adapterSessionID: String) {
@@ -135,7 +154,7 @@ actor NativePluginRuntimeStore {
         result: NativeJSONValue,
         ownerUserID: String,
         deviceID: String,
-        workspaceID: String,
+        workspaceID: String?,
         toolName: String
     ) throws -> NativeJSONValue {
         guard let session = sessions[adapterSessionID] else {

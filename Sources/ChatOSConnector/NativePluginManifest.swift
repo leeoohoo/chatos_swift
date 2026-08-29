@@ -19,7 +19,7 @@ enum NativePluginManifestLoader {
         componentKey requestedComponentKey: String,
         serverKey: String?,
         adapterSessionID: String,
-        workspaceRoot: URL,
+        workspaceRoot: URL?,
         permissionSnapshot: Set<String>,
         runtimeRootURL: URL
     ) throws -> NativePreparedPluginLaunch {
@@ -108,8 +108,12 @@ enum NativePluginManifestLoader {
             "CHATOS_PLUGIN_VISUAL_SESSION_DIR": visualSessionURL.path,
             "CHATOS_PLUGIN_ID": record.pluginID,
             "CHATOS_PLUGIN_COMPONENT_KEY": componentKey,
-            "CHATOS_WORKSPACE": workspaceRoot.path,
         ], uniquingKeysWith: { _, runtime in runtime })
+        if let workspaceRoot {
+            environment["CHATOS_WORKSPACE"] = workspaceRoot.path
+        } else {
+            environment.removeValue(forKey: "CHATOS_WORKSPACE")
+        }
 #if os(macOS)
         if manifest.name == "open-computer-use", server.bin == "open-computer-use",
            let applicationSupportURL = FileManager.default.urls(

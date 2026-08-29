@@ -4,12 +4,22 @@ import SwiftUI
 struct ProjectRunSettingsView: View {
     @EnvironmentObject private var model: AppModel
     @StateObject private var viewModel: ProjectRunSettingsViewModel
+    @ObservedObject private var petPreferences: PetPreferencesStore
+    let projectID: String
     let projectName: String
     let rootPath: String?
 
-    init(projectID: String, projectName: String, rootPath: String?, service: any ProjectRunServicing) {
+    init(
+        projectID: String,
+        projectName: String,
+        rootPath: String?,
+        service: any ProjectRunServicing,
+        petPreferences: PetPreferencesStore
+    ) {
+        self.projectID = projectID
         self.projectName = projectName
         self.rootPath = rootPath
+        self.petPreferences = petPreferences
         _viewModel = StateObject(wrappedValue: ProjectRunSettingsViewModel(projectID: projectID, service: service))
     }
 
@@ -17,6 +27,7 @@ struct ProjectRunSettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 pageHeader
+                petQuickAccessSection
                 if let error = viewModel.catalog?.errorMessage { notice(error, color: .red, icon: "exclamationmark.triangle.fill") }
                 if let error = viewModel.errorMessage { notice(error, color: .red, icon: "exclamationmark.triangle.fill") }
                 if let statusNotice = viewModel.notice {
@@ -38,6 +49,38 @@ struct ProjectRunSettingsView: View {
             await viewModel.monitorRuns()
         }
         .overlay { if viewModel.isLoading { ProgressView().controlSize(.large) } }
+    }
+
+    private var petQuickAccessSection: some View {
+        SettingsCard(
+            title: model.localized("宠物快捷访问", english: "Pet Quick Access"),
+            systemImage: "pawprint.fill"
+        ) {
+            HStack(alignment: .center, spacing: 18) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(model.localized("设为常用项目", english: "Add to Favorite Projects"))
+                        .appFont(.headline)
+                    Text(model.localized(
+                        "开启后，单击桌面宠物即可查看最近消息并直接发送新消息。",
+                        english: "When enabled, click the desktop pet to view recent messages and send new ones."
+                    ))
+                    .appFont(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 20)
+                Toggle("", isOn: favoriteBinding)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+        }
+    }
+
+    private var favoriteBinding: Binding<Bool> {
+        Binding(
+            get: { petPreferences.isFavorite(projectID: projectID) },
+            set: { petPreferences.setFavorite($0, projectID: projectID) }
+        )
     }
 
     private var pageHeader: some View {

@@ -13,6 +13,8 @@ final class PetOverlayWindowController: NSWindowController, NSWindowDelegate {
     private enum Layout {
         static let compactMessageSize = NSSize(width: 310, height: 112)
         static let expandedMessageWidth: CGFloat = 400
+        static let quickChatWidth: CGFloat = 420
+        static let quickChatConversationHeight: CGFloat = 500
         // Keep the process inspector compact and stable. Its timeline already scrolls,
         // so reserving space for several hypothetical nodes only creates empty space
         // for the common one-node case and makes the panel appear to jump in size.
@@ -21,6 +23,7 @@ final class PetOverlayWindowController: NSWindowController, NSWindowDelegate {
 
     private let store: PetOverlayStore
     private let preferences: PetPreferencesStore
+    private weak var model: AppModel?
     private let messagePanel: NSPanel
     private let interactionState = PetOverlayInteractionState()
     private let onOpen: (PetActivity) -> Void
@@ -44,6 +47,7 @@ final class PetOverlayWindowController: NSWindowController, NSWindowDelegate {
     ) {
         self.store = store
         self.preferences = preferences
+        self.model = model
         self.onOpen = onOpen
 
         let petPanel = Self.makePanel(size: NSSize(width: preferences.size, height: preferences.size))
@@ -70,6 +74,7 @@ final class PetOverlayWindowController: NSWindowController, NSWindowDelegate {
                 content: PetMessageView(
                     store: store,
                     interactionState: interactionState,
+                    preferences: preferences,
                     approvalViewModel: approvalViewModel,
                     onOpen: onOpen,
                     onRetry: onRetry,
@@ -184,6 +189,48 @@ final class PetOverlayWindowController: NSWindowController, NSWindowDelegate {
             }
             .store(in: &cancellables)
 
+        interactionState.$isQuickChatPresented
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] presented in
+                guard let self else { return }
+                if presented {
+                    self.applyMessageSize(self.preferredQuickChatMessageSize())
+                } else {
+                    self.applyMessageSize(
+                        self.interactionState.isMessageExpanded
+                            ? self.preferredExpandedMessageSize()
+                            : Layout.compactMessageSize
+                    )
+                }
+                self.updateMessageVisibility()
+            }
+            .store(in: &cancellables)
+
+        interactionState.$selectedQuickChatResourceID
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self, self.interactionState.isQuickChatPresented else { return }
+                self.applyMessageSize(self.preferredQuickChatMessageSize())
+            }
+            .store(in: &cancellables)
+
+        if let model {
+            Publishers.CombineLatest(
+                model.$projects.map(\.count).removeDuplicates(),
+                preferences.$favoriteProjectIDs.map(\.count).removeDuplicates()
+            )
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _, _ in
+                guard let self,
+                      self.interactionState.isQuickChatPresented,
+                      self.interactionState.selectedQuickChatResourceID == nil else { return }
+                self.applyMessageSize(self.preferredQuickChatMessageSize())
+            }
+            .store(in: &cancellables)
+        }
+
         interactionState.$selectedActivityID
             .removeDuplicates()
             .receive(on: RunLoop.main)
@@ -249,7 +296,8 @@ final class PetOverlayWindowController: NSWindowController, NSWindowDelegate {
             messagePanel.orderOut(nil)
             return
         }
-        if store.presentation.primaryActivity == nil,
+        if !interactionState.isQuickChatPresented,
+           store.presentation.primaryActivity == nil,
            interactionState.inspectedTaskActivity == nil {
             interactionState.isMessageExpanded = false
             messagePanel.orderOut(nil)
@@ -318,6 +366,27 @@ final class PetOverlayWindowController: NSWindowController, NSWindowDelegate {
         return NSSize(width: Layout.expandedMessageWidth, height: height)
     }
 
+    private func preferredQuickChatMessageSize() -> NSSize {
+        guard interactionState.selectedQuickChatResourceID == nil else {
+            return NSSize(
+                width: Layout.quickChatWidth,
+                height: Layout.quickChatConversationHeight
+            )
+        }
+
+        let resources = model?.petQuickChatResources ?? []
+        let rowCount = max(1, resources.count)
+        let rowHeight = CGFloat(rowCount) * 56
+        let rowSpacing = CGFloat(max(0, rowCount - 1)) * 8
+        let favoriteHintHeight: CGFloat = resources.allSatisfy { $0.kind == .contact } ? 38 : 0
+        let notificationFooterHeight: CGFloat = store.presentation.primaryActivity == nil ? 0 : 50
+        let contentHeight = 78 + rowHeight + rowSpacing + favoriteHintHeight + notificationFooterHeight
+        return NSSize(
+            width: Layout.quickChatWidth,
+            height: min(410, max(190, contentHeight))
+        )
+    }
+
     private func beginMovingPet() {
         isDraggingPet = true
         lastDragOriginX = window?.frame.origin.x
@@ -331,6 +400,14 @@ final class PetOverlayWindowController: NSWindowController, NSWindowDelegate {
         if didDrag {
             clampToVisibleScreen()
             savePosition()
+        } else {
+            interactionState.isMessageExpanded = false
+            interactionState.selectedActivityID = nil
+            interactionState.inspectedTaskActivity = nil
+            interactionState.isQuickChatPresented.toggle()
+            if !interactionState.isQuickChatPresented {
+                interactionState.selectedQuickChatResourceID = nil
+            }
         }
         updateMessageVisibility()
     }

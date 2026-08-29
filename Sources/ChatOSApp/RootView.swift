@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RootView: View {
     @EnvironmentObject private var model: AppModel
+    @State private var showingNotepad = false
 
     var body: some View {
         AuthenticationGateView(authentication: model.authentication) {
@@ -40,6 +41,12 @@ struct RootView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .tint(.accentColor)
+        .toolbar { WorkspaceToolbar(showingNotepad: $showingNotepad) }
+        .sheet(isPresented: $showingNotepad) {
+            NotepadSheet(service: model.notepadService) {
+                showingNotepad = false
+            }
+        }
     }
 
     @ViewBuilder
@@ -69,5 +76,35 @@ struct RootView: View {
             }
         }
         .workspaceFill()
+    }
+}
+
+private struct WorkspaceToolbar: ToolbarContent {
+    @EnvironmentObject private var model: AppModel
+    @Binding var showingNotepad: Bool
+
+    var body: some ToolbarContent {
+        ToolbarItemGroup(placement: .primaryAction) {
+            Button { showingNotepad = true } label: {
+                Image(systemName: "note.text")
+            }
+            .help(model.localized("打开记事本", english: "Open Notepad"))
+
+            Menu {
+                SettingsLink {
+                    Label(model.localized("设置", english: "Settings"), systemImage: "gear")
+                }
+                Divider()
+                Button(
+                    model.localized("退出登录", english: "Sign Out"),
+                    systemImage: "rectangle.portrait.and.arrow.right"
+                ) {
+                    model.authentication.logout()
+                }
+            } label: {
+                Image(systemName: "person.crop.circle")
+            }
+            .help(model.localized("账号", english: "Account"))
+        }
     }
 }

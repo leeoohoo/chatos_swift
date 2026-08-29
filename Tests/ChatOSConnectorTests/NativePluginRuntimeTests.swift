@@ -49,6 +49,24 @@ struct NativePluginRuntimeTests {
         }
     }
 
+    @Test("device-only plugin relay accepts no workspace and rejects workspace permissions")
+    func deviceOnlyPluginRelayScope() throws {
+        let scope = try NativePluginRelayScope.resolve(workspaceID: "", workspaces: [])
+
+        #expect(scope.workspaceID == nil)
+        try scope.validate(permissionSnapshot: ["process.spawn", "browser.page.read"])
+        #expect(throws: NativePluginRuntimeError.self) {
+            try scope.validate(permissionSnapshot: ["process.spawn", "workspace.read"])
+        }
+    }
+
+    @Test("plugin relay rejects a workspace that is not registered on this device")
+    func pluginRelayRejectsUnknownWorkspace() {
+        #expect(throws: NativePluginRuntimeError.self) {
+            try NativePluginRelayScope.resolve(workspaceID: "workspace-other", workspaces: [])
+        }
+    }
+
     @Test
     func browserSessionApprovalSummaryExplainsIsolationInsteadOfOnlyHashingArguments() {
         let summary = NativeLocalConnectorService.safeArgumentSummary(
@@ -407,9 +425,49 @@ struct NativePluginRuntimeTests {
 
         #expect(launch.executableURL == launcher.standardizedFileURL)
         #expect(launch.arguments == ["mcp"])
+        #expect(launch.environment["CHATOS_WORKSPACE"] == root.path)
 #if os(macOS)
         #expect(launch.environment["OPEN_COMPUTER_USE_MANAGED_APP_ROOT"]?.hasSuffix("/Open Computer Use/runtime") == true)
 #endif
+    }
+
+    @Test("device-only plugin launch does not receive a workspace environment path")
+    func deviceOnlyPluginLaunchOmitsWorkspaceEnvironment() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let installation = root.appendingPathComponent("plugin", isDirectory: true)
+        let launcher = installation
+            .appendingPathComponent("bin", isDirectory: true)
+            .appendingPathComponent("fixture")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(
+            at: launcher.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data("#!/bin/sh\n".utf8).write(to: launcher)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: launcher.path)
+        try Data("""
+        {"schemaVersion":3,"name":"fixture","version":"1.0.0","mcpServers":{"fixture":{"type":"stdio","bin":"fixture"}},"permissions":[{"permission":"process.spawn","required":true,"components":["fixture"]}]}
+        """.utf8).write(to: installation.appendingPathComponent("chatos.plugin.json"))
+
+        let launch = try NativePluginManifestLoader.prepare(
+            record: .init(
+                pluginID: "plugin-1",
+                releaseID: "release-1",
+                version: "1.0.0",
+                artifactSHA256: String(repeating: "a", count: 64),
+                installationPath: installation.path,
+                installedAt: "2026-08-29T00:00:00Z"
+            ),
+            componentKey: "fixture",
+            serverKey: nil,
+            adapterSessionID: "adapter-device-only",
+            workspaceRoot: nil,
+            permissionSnapshot: ["process.spawn"],
+            runtimeRootURL: root.appendingPathComponent("runtime", isDirectory: true)
+        )
+
+        #expect(launch.environment["CHATOS_WORKSPACE"] == nil)
     }
 
     @Test("stdio client initializes, lists tools and calls a tool")
@@ -459,6 +517,159 @@ struct NativePluginRuntimeTests {
             timeout: .seconds(2)
         )
         #expect(result.jsonObject?["content"]?.jsonArray?.first?.jsonObject?["text"]?.jsonString == "ok")
+        await client.terminate()
+    }
+
+    @Test("stdio client preserves the byte order of a large chunked response")
+    func stdioLargeChunkedResponse() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let script = root.appendingPathComponent("fixture.zsh")
+        try """
+        while IFS= read -r line; do
+          if [[ "$line" == *'tools/list'* ]]; then
+            echo '{"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"large","description":"Large response","inputSchema":{"type":"object"}}]}}'
+          elif [[ "$line" == *'tools/call'* ]]; then
+            /usr/bin/awk 'BEGIN {
+              printf "{\\\"jsonrpc\\\":\\\"2.0\\\",\\\"id\\\":3,\\\"result\\\":{\\\"content\\\":[{\\\"type\\\":\\\"text\\\",\\\"text\\\":\\\""
+              for (i = 0; i < 524288; i++) printf "x"
+              printf "\\\"}]}}\\n"
+            }'
+          elif [[ "$line" == *'initialize'* ]]; then
+            echo '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05","capabilities":{"tools":{}}}}'
+          fi
+        done
+        """.write(to: script, atomically: true, encoding: .utf8)
+        let manifest = try JSONDecoder().decode(
+            NativePluginManifest.self,
+            from: Data("""
+            {"schemaVersion":3,"name":"fixture","version":"1.0.0","mcpServers":{"fixture":{"type":"stdio","bin":"fixture","args":[]}}}
+            """.utf8)
+        )
+        let launch = NativePreparedPluginLaunch(
+            manifest: manifest,
+            componentKey: "fixture",
+            server: manifest.mcpServers["fixture"]!,
+            executableURL: URL(fileURLWithPath: "/bin/zsh"),
+            arguments: [script.path],
+            environment: [:],
+            installationURL: root,
+            visualSessionURL: root.appendingPathComponent("visual"),
+            artifactURL: root.appendingPathComponent("artifacts"),
+            displayName: "Fixture"
+        )
+        let client = NativePluginStdioClient(launch: launch)
+        try await client.start()
+        _ = try await client.initialize()
+        let result = try await client.callTool(
+            name: "large",
+            arguments: .object([:]),
+            timeout: .seconds(5)
+        )
+        let text = try #require(
+            result.jsonObject?["content"]?.jsonArray?.first?.jsonObject?["text"]?.jsonString
+        )
+        #expect(text.count == 524_288)
+        #expect(text.allSatisfy { $0 == "x" })
+        await client.terminate()
+    }
+
+    @Test(
+        "installed Browser CDP completes the real Swift stdio open, navigate, screenshot and snapshot path",
+        .enabled(if: ProcessInfo.processInfo.environment["CHATOS_BROWSER_CDP_INTEGRATION_ROOT"] != nil)
+    )
+    func installedBrowserCDPSwiftStdioIntegration() async throws {
+        let installationPath = try #require(
+            ProcessInfo.processInfo.environment["CHATOS_BROWSER_CDP_INTEGRATION_ROOT"]
+        )
+        let installation = URL(fileURLWithPath: installationPath, isDirectory: true)
+        let manifest = try JSONDecoder().decode(
+            NativePluginManifest.self,
+            from: Data(contentsOf: installation.appendingPathComponent("chatos.plugin.json"))
+        )
+        let runtimeRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: runtimeRoot) }
+        let launch = try NativePluginManifestLoader.prepare(
+            record: .init(
+                pluginID: "browser-cdp-integration",
+                releaseID: "browser-cdp-integration-release",
+                version: manifest.version,
+                artifactSHA256: String(repeating: "a", count: 64),
+                installationPath: installation.path,
+                installedAt: "2026-08-29T00:00:00Z"
+            ),
+            componentKey: "browser-cdp",
+            serverKey: nil,
+            adapterSessionID: UUID().uuidString.lowercased(),
+            workspaceRoot: nil,
+            permissionSnapshot: Set(manifest.permissions.map(\.permission)),
+            runtimeRootURL: runtimeRoot
+        )
+        let client = NativePluginStdioClient(launch: launch)
+        try await client.start()
+        _ = try await client.initialize()
+
+        do {
+            let opened = try await client.callTool(
+                name: "browser_session_open",
+                arguments: .object([
+                    "mode": .string("managed"),
+                    "persistent_profile": .bool(false),
+                    "headless": .bool(true),
+                    "session_name": .string("Swift stdio integration"),
+                ]),
+                timeout: .seconds(60)
+            )
+            #expect(opened.jsonObject?["isError"]?.jsonBool != true)
+
+            let navigated = try await client.callTool(
+                name: "browser_navigate",
+                arguments: .object([
+                    "timeout_ms": .number(30_000),
+                    "url": .string("https://github.com/search?q=%22DeepSeek+Harness%22&type=repositories"),
+                ]),
+                timeout: .seconds(45)
+            )
+            #expect(navigated.jsonObject?["isError"]?.jsonBool != true)
+
+            let screenshot = try await client.callTool(
+                name: "browser_screenshot",
+                arguments: .object(["full_page": .bool(false)]),
+                timeout: .seconds(30)
+            )
+            #expect(screenshot.jsonObject?["isError"]?.jsonBool != true)
+
+            let snapshot = try await client.callTool(
+                name: "browser_snapshot",
+                arguments: .object([:]),
+                timeout: .seconds(30)
+            )
+            #expect(snapshot.jsonObject?["isError"]?.jsonBool != true)
+            #expect(snapshot.jsonObject?["structuredContent"]?.jsonArray?.isEmpty == false)
+
+            let status = try await client.callTool(
+                name: "browser_session_status",
+                arguments: .object([:]),
+                timeout: .seconds(10)
+            )
+            #expect(status.jsonObject?["structuredContent"]?.jsonObject?["state"]?.jsonString == "open")
+            _ = try await client.callTool(
+                name: "browser_session_close",
+                arguments: .object([:]),
+                timeout: .seconds(10)
+            )
+        } catch {
+            _ = try? await client.callTool(
+                name: "browser_session_close",
+                arguments: .object([:]),
+                timeout: .seconds(5)
+            )
+            await client.terminate()
+            throw error
+        }
         await client.terminate()
     }
 
@@ -593,8 +804,39 @@ struct NativePluginRuntimeTests {
             displayName: "Browser fixture",
             visualSessionURL: visual,
             artifactURL: artifacts,
-            projectRootURL: root
+            projectRootURL: root,
+            workspaceID: "workspace-1"
         )
+        _ = try await store.validate(
+            adapterSessionID: identity.adapterSessionID,
+            pluginID: identity.pluginID,
+            releaseID: identity.releaseID,
+            artifactSHA256: identity.artifactSHA256,
+            componentKey: identity.componentKey,
+            workspaceID: "workspace-1"
+        )
+        do {
+            _ = try await store.validate(
+                adapterSessionID: identity.adapterSessionID,
+                pluginID: identity.pluginID,
+                releaseID: identity.releaseID,
+                artifactSHA256: identity.artifactSHA256,
+                componentKey: identity.componentKey,
+                workspaceID: nil
+            )
+            Issue.record("project-scoped plugin session accepted a device-only execute scope")
+        } catch is NativePluginRuntimeError {
+            // Expected: prepare and execute/cancel must retain the same relay scope.
+        }
+        do {
+            try await store.validateScopeIfPresent(
+                adapterSessionID: identity.adapterSessionID,
+                workspaceID: nil
+            )
+            Issue.record("project-scoped plugin session accepted a device-only cancel scope")
+        } catch is NativePluginRuntimeError {
+            // Expected.
+        }
 
         _ = try await store.call(
             adapterSessionID: identity.adapterSessionID,
@@ -1042,7 +1284,8 @@ struct NativePluginRuntimeTests {
                 displayName: adapterSessionID,
                 visualSessionURL: fixture.2,
                 artifactURL: fixture.3,
-                projectRootURL: root
+                projectRootURL: root,
+                workspaceID: "workspace-1"
             )
         }
 
@@ -1104,7 +1347,8 @@ struct NativePluginRuntimeTests {
                 displayName: adapterSessionID,
                 visualSessionURL: fixture.2,
                 artifactURL: fixture.3,
-                projectRootURL: root
+                projectRootURL: root,
+                workspaceID: "workspace-1"
             )
         }
 

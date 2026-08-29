@@ -9,7 +9,7 @@ final class PetOverlayStore: ObservableObject {
     private var reducer = PetStateReducer()
     private var expirationTask: Task<Void, Never>?
     private var sourceVersions: [PetActivitySource: Int64] = [:]
-    private var dismissedLegacyThrough: [String: Date] = [:]
+    private var dismissedActivityIdentities: [String: Date] = [:]
     var onDisposition: ((PetActivity, PetActivityDisposition) -> Void)?
 
     private static let maximumDismissedActivities = 256
@@ -134,6 +134,7 @@ final class PetOverlayStore: ObservableObject {
     func clear() {
         reducer.removeAll()
         sourceVersions.removeAll()
+        dismissedActivityIdentities.removeAll()
         publishPresentation()
     }
 
@@ -153,14 +154,16 @@ final class PetOverlayStore: ObservableObject {
         _ activity: PetActivity,
         disposition: PetActivityDisposition = .ignored
     ) {
-        if activity.inboxID == nil {
-            dismissedLegacyThrough[activity.id] = max(Date(), activity.updatedAt)
-            trimLegacyDismissals()
-        }
+        dismissedActivityIdentities[activityIdentity(activity)] = Date()
+        trimDismissedActivities()
         reducer.apply(.remove(id: activity.id))
         bumpVersion(for: activity.source)
         publishPresentation()
         onDisposition?(activity, disposition)
+    }
+
+    func restoreDismissal(_ activity: PetActivity) {
+        dismissedActivityIdentities.removeValue(forKey: activityIdentity(activity))
     }
 
     private func publishPresentation() {
@@ -185,21 +188,24 @@ final class PetOverlayStore: ObservableObject {
     }
 
     private func shouldSuppress(_ activity: PetActivity) -> Bool {
-        guard activity.inboxID == nil,
-              let cutoff = dismissedLegacyThrough[activity.id] else { return false }
-        if activity.updatedAt <= cutoff {
-            return true
-        }
-        dismissedLegacyThrough.removeValue(forKey: activity.id)
-        return false
+        dismissedActivityIdentities[activityIdentity(activity)] != nil
     }
 
-    private func trimLegacyDismissals() {
-        if dismissedLegacyThrough.count > Self.maximumDismissedActivities {
-            let keep = dismissedLegacyThrough
+    private func activityIdentity(_ activity: PetActivity) -> String {
+        let version = activity.activityVersion
+            ?? activity.route.runID
+            ?? activity.route.turnID
+            ?? activity.eventID
+            ?? "1"
+        return "\(activity.source.rawValue)|\(activity.id)|\(version)"
+    }
+
+    private func trimDismissedActivities() {
+        if dismissedActivityIdentities.count > Self.maximumDismissedActivities {
+            let keep = dismissedActivityIdentities
                 .sorted { $0.value > $1.value }
                 .prefix(Self.maximumDismissedActivities)
-            dismissedLegacyThrough = Dictionary(
+            dismissedActivityIdentities = Dictionary(
                 uniqueKeysWithValues: keep.map { ($0.key, $0.value) }
             )
         }

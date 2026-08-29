@@ -450,88 +450,8 @@ final class AppModel: ObservableObject {
         try await petActivityInboxService.apply(disposition, to: activity)
     }
 
-    func recoverPetActivities() async -> [PetActivity] {
-        async let inboxResult = try? petActivityInboxService.fetchOpenActivities(limit: 200)
-        let legacyActivities = await recoverLegacyPetActivities()
-        guard let inboxActivities = await inboxResult else {
-            return legacyActivities
-        }
-        return mergePetInboxActivities(inboxActivities, with: legacyActivities)
-    }
-
-    private func recoverLegacyPetActivities() async -> [PetActivity] {
-        var targets: [PetRecoveryTarget] = []
-        var seenConversationIDs = Set<String>()
-        for project in projects {
-            guard let conversationID = project.conversationID,
-                  seenConversationIDs.insert(conversationID).inserted else { continue }
-            targets.append(PetRecoveryTarget(conversationID: conversationID, projectID: project.id))
-        }
-        for contact in contacts {
-            guard let conversationID = contact.conversationID,
-                  seenConversationIDs.insert(conversationID).inserted else { continue }
-            targets.append(PetRecoveryTarget(conversationID: conversationID, projectID: nil))
-        }
-
-        let promptService = askUserPromptService
-        let historyService = conversationService
-        let graphService = messageTaskGraphService
-        return await withTaskGroup(of: [PetActivity].self) { group in
-            var nextIndex = 0
-            let maximumConcurrentRecoveries = 6
-
-            func addNextTarget() -> Bool {
-                guard nextIndex < targets.count else { return false }
-                let target = targets[nextIndex]
-                nextIndex += 1
-                group.addTask {
-                    await loadRecoveredPetActivities(
-                        target: target,
-                        promptService: promptService,
-                        historyService: historyService,
-                        graphService: graphService
-                    )
-                }
-                return true
-            }
-
-            for _ in 0..<min(maximumConcurrentRecoveries, targets.count) {
-                _ = addNextTarget()
-            }
-            var activities: [PetActivity] = []
-            while let batch = await group.next() {
-                activities.append(contentsOf: batch)
-                _ = addNextTarget()
-            }
-            return activities
-        }
-    }
-
-    private func mergePetInboxActivities(
-        _ inboxActivities: [PetActivity],
-        with legacyActivities: [PetActivity]
-    ) -> [PetActivity] {
-        let persistedKeys = Set(inboxActivities.map(petActivityBusinessKey))
-        return inboxActivities + legacyActivities.filter {
-            !persistedKeys.contains(petActivityBusinessKey($0))
-        }
-    }
-
-    private func petActivityBusinessKey(_ activity: PetActivity) -> String {
-        switch activity.source {
-        case .askUserPrompt:
-            return "ask-user:\(activity.route.promptID ?? activity.id)"
-        case .taskRunner:
-            return "task-runner:\(activity.route.taskID ?? activity.id):\(activity.route.runID ?? "legacy")"
-        case .taskBoard:
-            return "task-board:\(activity.route.taskID ?? activity.id)"
-        case .chat:
-            return "chat:\(activity.route.conversationID ?? ""):\(activity.route.turnID ?? activity.id)"
-        case .projectExecution:
-            return "project-execution:\(activity.route.runID ?? activity.route.turnID ?? activity.id)"
-        case .localApproval:
-            return activity.id
-        }
+    func recoverPetActivities() async throws -> [PetActivity] {
+        try await petActivityInboxService.fetchOpenActivities(limit: 500)
     }
 
     var interfaceDynamicTypeSize: DynamicTypeSize {
@@ -791,6 +711,48 @@ final class AppModel: ObservableObject {
         }
     }
 
+    var petQuickChatResources: [PetQuickChatResource] {
+        var resources: [PetQuickChatResource] = []
+        let preferredContactID = defaultProjectContact?.id
+        if let contact = contacts.first(where: { $0.id == preferredContactID })
+            ?? contacts.first(where: {
+                $0.title.trimmingCharacters(in: .whitespacesAndNewlines) == "叽咕狸"
+            }) {
+            resources.append(PetQuickChatResource(
+                id: "contact:\(contact.id)",
+                sourceID: contact.id,
+                kind: .contact,
+                title: contact.title,
+                subtitle: contact.subtitle,
+                conversationID: contact.conversationID
+            ))
+        }
+
+        resources.append(contentsOf: projects
+            .filter { petPreferences.isFavorite(projectID: $0.id) }
+            .map { project in
+                PetQuickChatResource(
+                    id: "project:\(project.id)",
+                    sourceID: project.id,
+                    kind: .project,
+                    title: project.title,
+                    subtitle: project.subtitle,
+                    conversationID: project.conversationID
+                )
+            })
+        return resources
+    }
+
+    func petConversation(for resource: PetQuickChatResource) -> ConversationSessionViewModel? {
+        guard let conversationID = resource.conversationID else {
+            if resource.kind == .project {
+                prepareProjectConversationIfNeeded(projectID: resource.sourceID)
+            }
+            return nil
+        }
+        return conversation(for: conversationID, allowsPlanMode: resource.allowsPlanMode)
+    }
+
     func registerCreatedProject(_ project: WorkspaceProject) {
         if let index = workspaceProjects.firstIndex(where: { $0.id == project.id }) {
             workspaceProjects[index] = project
@@ -979,11 +941,6 @@ final class AppModel: ObservableObject {
     }
 }
 
-private struct PetRecoveryTarget: Sendable {
-    var conversationID: String
-    var projectID: String?
-}
-
 private enum PetActivityActionError: LocalizedError {
     case retryUnavailable
     case cancelUnavailable
@@ -1004,207 +961,5 @@ private enum PetActivityActionError: LocalizedError {
         case .taskDetailUnavailable:
             "当前事件缺少读取任务执行过程所需的信息。"
         }
-    }
-}
-
-private func loadRecoveredPetActivities(
-    target: PetRecoveryTarget,
-    promptService: ChatOSAskUserPromptService,
-    historyService: ChatOSConversationService,
-    graphService: ChatOSMessageTaskGraphService
-) async -> [PetActivity] {
-    async let promptResult = try? await promptService.fetchPrompts(
-        sessionID: target.conversationID,
-        limit: 100
-    )
-    async let historyResult = try? await historyService.fetchHistory(
-        ConversationHistoryQuery(
-            sessionID: target.conversationID,
-            limit: 30,
-            requestGeneration: 0
-        )
-    )
-    let (prompts, history) = await (promptResult, historyResult)
-    var recovered = PetActivityRecoveryMapper.activities(
-        conversationID: target.conversationID,
-        projectID: target.projectID,
-        turns: history?.turns ?? []
-    )
-    let graphResults = await loadRecoveredTaskGraphs(
-        turns: history?.turns ?? [],
-        projectID: target.projectID,
-        graphService: graphService
-    )
-    if !graphResults.isEmpty {
-        let coveredTaskIDs = Set(graphResults.flatMap(\.taskIDs))
-        let coveredExecutionIDs = Set(graphResults.compactMap(\.executionActivityID))
-        recovered.removeAll { activity in
-            coveredTaskIDs.contains(activity.route.taskID ?? "")
-                || coveredExecutionIDs.contains(activity.id)
-        }
-        recovered.append(contentsOf: graphResults.flatMap(\.activities))
-    }
-    recovered = await reconcileRecoveredTaskActivities(
-        recovered,
-        graphService: graphService
-    )
-    recovered.append(contentsOf: (prompts ?? []).compactMap { prompt in
-        guard prompt.status.isPending else { return nil }
-        let trimmedTitle = prompt.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedMessage = prompt.message.trimmingCharacters(in: .whitespacesAndNewlines)
-        return PetActivity(
-            id: "ask-user:\(prompt.id)",
-            source: .askUserPrompt,
-            kind: .waitingForUser,
-            title: trimmedTitle.isEmpty ? "AI 正在等待你的输入" : trimmedTitle,
-            detail: trimmedMessage.isEmpty ? nil : trimmedMessage,
-            route: PetActivityRoute(
-                projectID: target.projectID,
-                conversationID: target.conversationID,
-                turnID: prompt.turnID,
-                promptID: prompt.id
-            ),
-            updatedAt: prompt.updatedAt ?? prompt.createdAt ?? Date()
-        )
-    })
-    return recovered
-}
-
-private struct RecoveredTaskGraphResult: Sendable {
-    var taskIDs: [String]
-    var executionActivityID: String?
-    var activities: [PetActivity]
-}
-
-private func loadRecoveredTaskGraphs(
-    turns: [ConversationTurn],
-    projectID: String?,
-    graphService: ChatOSMessageTaskGraphService,
-    now: Date = Date()
-) async -> [RecoveredTaskGraphResult] {
-    let candidates = turns.filter { turn in
-        guard let context = turn.projectExecutionContext,
-              context.isProjectExecution else { return false }
-        let status = (context.overallStatus ?? context.confirmationStatus ?? "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-            .replacingOccurrences(of: "-", with: "_")
-        return ["confirmed", "processing", "running", "executing", "in_progress", "blocked"]
-            .contains(status)
-    }
-    guard !candidates.isEmpty else { return [] }
-
-    return await withTaskGroup(of: RecoveredTaskGraphResult?.self) { group in
-        for turn in candidates {
-            group.addTask {
-                do {
-                    let graph = try await graphService.fetchGraph(
-                        messageID: turn.userMessage.id,
-                        lookup: turn.resolvedMessageTaskLookup
-                    )
-                    let activities = graph.nodes.compactMap { node -> PetActivity? in
-                        let task = node.task
-                        let messageID = task.sourceUserMessageID
-                            ?? graph.sourceUserMessageID
-                            ?? turn.userMessage.id
-                        let fallback = PetActivity(
-                            id: "task-runner:\(task.id)",
-                            source: .taskRunner,
-                            kind: .working,
-                            title: task.title,
-                            detail: task.resultSummary,
-                            route: PetActivityRoute(
-                                projectID: projectID ?? turn.projectExecutionContext?.projectID,
-                                conversationID: task.sourceSessionID
-                                    ?? graph.sourceSessionID
-                                    ?? turn.sessionID,
-                                turnID: task.sourceTurnID ?? graph.sourceTurnID ?? turn.id,
-                                messageID: messageID,
-                                taskID: task.id,
-                                runID: task.lastRunID
-                            ),
-                            updatedAt: task.updatedAt ?? turn.startedAt
-                        )
-                        return PetActivityRecoveryMapper.applyingAuthoritativeTask(
-                            task,
-                            to: fallback,
-                            now: now
-                        )
-                    }
-                    let executionID = turn.projectExecutionContext?.executionGroupID
-                        .map { "project-execution:\($0)" }
-                        ?? "project-execution:\(turn.id)"
-                    return RecoveredTaskGraphResult(
-                        taskIDs: graph.nodes.map(\.task.id),
-                        executionActivityID: executionID,
-                        activities: activities
-                    )
-                } catch {
-                    return nil
-                }
-            }
-        }
-        var results: [RecoveredTaskGraphResult] = []
-        for await result in group {
-            if let result {
-                results.append(result)
-            }
-        }
-        return results
-    }
-}
-
-private func reconcileRecoveredTaskActivities(
-    _ activities: [PetActivity],
-    graphService: ChatOSMessageTaskGraphService,
-    now: Date = Date()
-) async -> [PetActivity] {
-    let candidates = activities.filter {
-        $0.source == .taskRunner
-            && $0.route.messageID?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-            && $0.route.taskID?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-    }
-    guard !candidates.isEmpty else { return activities }
-
-    let resolved = await withTaskGroup(of: (String, PetActivity?).self) { group in
-        for activity in candidates {
-            group.addTask {
-                guard let messageID = activity.route.messageID,
-                      let taskID = activity.route.taskID else {
-                    return (activity.id, nil)
-                }
-                do {
-                    let task = try await graphService.fetchTask(
-                        messageID: messageID,
-                        taskID: taskID,
-                        lookup: MessageTaskLookup(
-                            sessionID: activity.route.conversationID,
-                            turnID: activity.route.turnID
-                        )
-                    )
-                    return (
-                        activity.id,
-                        PetActivityRecoveryMapper.applyingAuthoritativeTask(
-                            task,
-                            to: activity,
-                            now: now
-                        )
-                    )
-                } catch {
-                    let isRecent = now.timeIntervalSince(activity.updatedAt) <= 10 * 60
-                    return (activity.id, isRecent ? activity : nil)
-                }
-            }
-        }
-        var values: [String: PetActivity?] = [:]
-        for await (id, activity) in group {
-            values[id] = activity
-        }
-        return values
-    }
-
-    return activities.compactMap { activity in
-        guard candidates.contains(where: { $0.id == activity.id }) else { return activity }
-        return resolved[activity.id] ?? nil
     }
 }

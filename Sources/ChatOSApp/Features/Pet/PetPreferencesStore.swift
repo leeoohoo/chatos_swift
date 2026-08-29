@@ -8,6 +8,7 @@ final class PetPreferencesStore: ObservableObject {
         static let showProcess = "ChatOS.pet.showProcess"
         static let showCompletions = "ChatOS.pet.showCompletions"
         static let showAcrossSpaces = "ChatOS.pet.showAcrossSpaces"
+        static let favoriteProjectIDs = "ChatOS.pet.favorite-project-ids"
     }
 
     @Published var isEnabled: Bool {
@@ -32,6 +33,7 @@ final class PetPreferencesStore: ObservableObject {
     @Published var showAcrossSpaces: Bool {
         didSet { defaults.set(showAcrossSpaces, forKey: Key.showAcrossSpaces) }
     }
+    @Published private(set) var favoriteProjectIDs: Set<String>
     @Published private(set) var resetPositionRequestID = UUID()
 
     private let defaults: UserDefaults
@@ -43,6 +45,22 @@ final class PetPreferencesStore: ObservableObject {
         self.showProcess = defaults.object(forKey: Key.showProcess) as? Bool ?? true
         self.showCompletions = defaults.object(forKey: Key.showCompletions) as? Bool ?? true
         self.showAcrossSpaces = defaults.object(forKey: Key.showAcrossSpaces) as? Bool ?? true
+        self.favoriteProjectIDs = Set(defaults.stringArray(forKey: Key.favoriteProjectIDs) ?? [])
+    }
+
+    func isFavorite(projectID: String) -> Bool {
+        favoriteProjectIDs.contains(projectID)
+    }
+
+    func setFavorite(_ isFavorite: Bool, projectID: String) {
+        let normalizedID = projectID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedID.isEmpty else { return }
+        if isFavorite {
+            favoriteProjectIDs.insert(normalizedID)
+        } else {
+            favoriteProjectIDs.remove(normalizedID)
+        }
+        defaults.set(favoriteProjectIDs.sorted(), forKey: Key.favoriteProjectIDs)
     }
 
     func requestPositionReset() {

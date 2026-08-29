@@ -13,6 +13,8 @@ final class PetOverlayInteractionState: ObservableObject {
     @Published var isMessageExpanded = false
     @Published var selectedActivityID: String?
     @Published var inspectedTaskActivity: PetActivity?
+    @Published var isQuickChatPresented = false
+    @Published var selectedQuickChatResourceID: String?
 }
 
 struct PetCharacterView: View {
@@ -48,6 +50,7 @@ struct PetMessageView: View {
     @EnvironmentObject private var model: AppModel
     @ObservedObject var store: PetOverlayStore
     @ObservedObject var interactionState: PetOverlayInteractionState
+    @ObservedObject var preferences: PetPreferencesStore
     @ObservedObject var approvalViewModel: LocalConnectorControlCenterViewModel
     let onOpen: (PetActivity) -> Void
     let onRetry: (PetActivity, String) async throws -> Void
@@ -65,7 +68,13 @@ struct PetMessageView: View {
     @State private var cancellationErrors: [String: String] = [:]
 
     var body: some View {
-        if let primaryActivity = store.presentation.primaryActivity
+        if interactionState.isQuickChatPresented {
+            PetQuickChatView(
+                interactionState: interactionState,
+                resources: model.petQuickChatResources,
+                hasPendingNotification: store.presentation.primaryActivity != nil
+            )
+        } else if let primaryActivity = store.presentation.primaryActivity
             ?? interactionState.inspectedTaskActivity {
             let activity = interactionState.inspectedTaskActivity
                 ?? (interactionState.isMessageExpanded
@@ -135,6 +144,7 @@ struct PetMessageView: View {
 
     private func compactCard(_ activity: PetActivity) -> some View {
         Button {
+            interactionState.isQuickChatPresented = false
             interactionState.selectedActivityID = activity.id
             interactionState.isMessageExpanded = true
         } label: {
@@ -457,10 +467,16 @@ struct PetMessageView: View {
     private func retryContent(_ activity: PetActivity) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             if let detail = displayText(activity.detail) {
-                Text(detail)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                ScrollView {
+                    Text(detail)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(minHeight: 44, maxHeight: .infinity)
+                .layoutPriority(1)
             }
 
             if canRetry(activity) {
@@ -470,7 +486,7 @@ struct PetMessageView: View {
                     .font(.system(size: 12))
                     .scrollContentBackground(.hidden)
                     .padding(5)
-                    .frame(minHeight: 82)
+                    .frame(height: 72)
                     .background(Color(nsColor: .textBackgroundColor).opacity(0.78), in: RoundedRectangle(cornerRadius: 8))
                     .overlay { RoundedRectangle(cornerRadius: 8).stroke(.separator) }
             } else {
@@ -483,6 +499,7 @@ struct PetMessageView: View {
                 Text(actionMessage)
                     .font(.system(size: 11))
                     .foregroundStyle(actionSucceeded ? Color.green : Color.red)
+                    .lineLimit(2)
             }
 
             HStack {
@@ -517,6 +534,7 @@ struct PetMessageView: View {
             .controlSize(.small)
         }
         .padding(13)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private func genericContent(_ activity: PetActivity) -> some View {

@@ -19,8 +19,8 @@ enum NativePluginArtifactRegistrar {
         identity: NativePluginRuntimeStore.Identity,
         ownerUserID: String,
         deviceID: String,
-        workspaceID: String,
-        workspaceRootURL: URL,
+        workspaceID: String?,
+        workspaceRootURL: URL?,
         artifactRootURL: URL,
         permissionSnapshot: Set<String>,
         toolName: String
@@ -32,6 +32,9 @@ enum NativePluginArtifactRegistrar {
         }
         guard permissionSnapshot.contains("artifact.create") else {
             throw NativePluginRuntimeError.permissionDenied("Plugin 未获准注册本地产物")
+        }
+        guard let workspaceID, let workspaceRootURL else {
+            throw NativePluginRuntimeError.permissionDenied("Plugin 注册项目产物需要项目工作区")
         }
         guard rawCandidates.count <= maximumArtifactsPerCall else {
             throw NativePluginRuntimeError.invalidMCPResponse("Plugin MCP 返回的产物数量超过限制")

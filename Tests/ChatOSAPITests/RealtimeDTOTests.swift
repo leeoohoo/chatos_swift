@@ -48,6 +48,36 @@ final class RealtimeDTOTests: XCTestCase {
         XCTAssertNil(activity.expiresAt)
     }
 
+    func testClosedInboxUpdateRemovesPersistedActivity() throws {
+        let data = Data(#"""
+        {
+          "type":"event",
+          "event":"pet_activity_inbox.updated",
+          "event_id":"event-inbox-2",
+          "event_sequence":100,
+          "payload":{
+            "kind":"pet_activity_inbox_updated",
+            "activity":{
+              "id":"pet_2",
+              "activity_key":"task-runner:task-2",
+              "activity_version":"run-3",
+              "source":"task_runner",
+              "kind":"blocked",
+              "title":"任务被阻塞",
+              "route":{"task_id":"task-2","run_id":"run-3"},
+              "inbox_status":"handled",
+              "occurred_at":"2026-08-28T08:00:00Z",
+              "updated_at":"2026-08-28T08:01:00Z"
+            }
+          },
+          "ts":"2026-08-28T08:01:00Z"
+        }
+        """#.utf8)
+
+        let envelope = try JSONDecoder().decode(PetRealtimeEnvelopeDTO.self, from: data)
+        XCTAssertEqual(envelope.petActivityEvent(), .remove(id: "task-runner:task-2"))
+    }
+
     func testChatStreamEnvelopeMapsStableIdentityAndSequence() throws {
         let envelope = try JSONDecoder().decode(
             RealtimeEventEnvelopeDTO.self,
@@ -87,17 +117,12 @@ final class RealtimeDTOTests: XCTestCase {
         XCTAssertEqual(update.status, .pending)
     }
 
-    func testAskUserPromptMapsPetPromptRoute() throws {
+    func testAskUserPromptDoesNotBypassPetInbox() throws {
         let envelope = try JSONDecoder().decode(
             PetRealtimeEnvelopeDTO.self,
             from: Data(askUserFixtureJSON.utf8)
         )
-        guard case let .upsert(activity) = try XCTUnwrap(envelope.petActivityEvent()) else {
-            return XCTFail("expected upsert")
-        }
-        XCTAssertEqual(activity.route.conversationID, "conversation-1")
-        XCTAssertEqual(activity.route.turnID, "turn-1")
-        XCTAssertEqual(activity.route.promptID, "prompt-1")
+        XCTAssertNil(envelope.petActivityEvent())
     }
 
     func testToolRealtimeEventProducesSafeExecutionProcessUpdate() throws {
@@ -133,33 +158,20 @@ final class RealtimeDTOTests: XCTestCase {
         XCTAssertEqual(topics, [["scope": "user"]])
     }
 
-    func testTaskRunnerCompletionPersistsUntilUserAcknowledgesIt() throws {
+    func testTaskRunnerEventDoesNotBypassPetInbox() throws {
         let envelope = try JSONDecoder().decode(
             PetRealtimeEnvelopeDTO.self,
             from: Data(taskRunnerFixtureJSON.utf8)
         )
-        guard case let .upsert(activity) = try XCTUnwrap(envelope.petActivityEvent()) else {
-            return XCTFail("expected upsert")
-        }
-        XCTAssertEqual(activity.id, "task-runner:task-1")
-        XCTAssertEqual(activity.kind, .succeeded)
-        XCTAssertEqual(activity.route.projectID, "project-1")
-        XCTAssertEqual(activity.route.taskID, "task-1")
-        XCTAssertEqual(activity.route.runID, "run-1")
-        XCTAssertNil(activity.expiresAt)
+        XCTAssertNil(envelope.petActivityEvent())
     }
 
-    func testTaskBoardReviewRequiredMapsToPersistentWaitingState() throws {
+    func testTaskBoardEventDoesNotBypassPetInbox() throws {
         let envelope = try JSONDecoder().decode(
             PetRealtimeEnvelopeDTO.self,
             from: Data(taskReviewFixtureJSON.utf8)
         )
-        guard case let .upsert(activity) = try XCTUnwrap(envelope.petActivityEvent()) else {
-            return XCTFail("expected upsert")
-        }
-        XCTAssertEqual(activity.id, "task-review:review-1")
-        XCTAssertEqual(activity.kind, .waitingForUser)
-        XCTAssertNil(activity.expiresAt)
+        XCTAssertNil(envelope.petActivityEvent())
     }
 
     private let fixtureJSON = #"""

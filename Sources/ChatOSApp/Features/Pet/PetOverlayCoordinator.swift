@@ -60,6 +60,8 @@ final class PetOverlayCoordinator {
                     try await model?.applyPetActivityDisposition(disposition, to: activity)
                 } catch {
                     await MainActor.run {
+                        self?.store.restoreDismissal(activity)
+                        self?.store.apply(.upsert(activity))
                         self?.recoverCloudState()
                     }
                 }
@@ -208,18 +210,23 @@ final class PetOverlayCoordinator {
         ]
         let expectedVersions = store.versions(for: sources)
         recoveryTask = Task { [weak self, weak model] in
-            guard let activities = await model?.recoverPetActivities(),
-                  let self,
-                  !Task.isCancelled else { return }
-            let visibleActivities = activities.filter {
-                self.shouldApply(.upsert($0))
+            do {
+                guard let model else { return }
+                let activities = try await model.recoverPetActivities()
+                guard let self, !Task.isCancelled else { return }
+                let visibleActivities = activities.filter {
+                    self.shouldApply(.upsert($0))
+                }
+                self.store.reconcileActivities(
+                    visibleActivities,
+                    sources: sources,
+                    expectedVersions: expectedVersions
+                )
+                self.recoveryTask = nil
+            } catch {
+                guard !Task.isCancelled else { return }
+                self?.recoveryTask = nil
             }
-            self.store.reconcileActivities(
-                visibleActivities,
-                sources: sources,
-                expectedVersions: expectedVersions
-            )
-            self.recoveryTask = nil
         }
     }
 

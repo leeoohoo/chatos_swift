@@ -279,6 +279,19 @@ Pet Window Controller 不直接修改 `AppModel.selection`，所有导航仍由 
 
 设置保存在独立 `PetPreferencesStore`，不要继续扩大 `AppModel` 的 UserDefaults 属性数量。
 
+### 11. 常用项目快捷聊天
+
+宠物单击与事件通知使用同一个消息 Panel，但保持两套独立状态，不把聊天入口伪装成 `PetActivity`：
+
+- 项目设置提供“设为常用项目”开关，项目 ID 由 `PetPreferencesStore` 本地持久化。
+- 单击宠物打开快捷聊天；拖动超过阈值只移动宠物，不触发单击行为。
+- 一级列表固定优先展示联系人“叽咕狸”，其后展示当前工作区内已设为常用的项目。
+- 列表只读取当前工作区存在的项目；工作区暂时未加载时不删除本地保存的常用项目 ID。
+- 详情复用 `AppModel` 的 `ConversationSessionViewModel` 缓存、历史分页、Realtime 和发送命令，不建立第二套会话状态。
+- 快捷详情只展示最近消息和轻量输入框，不复制完整聊天页的附件、模型、Plan、任务图等控制项。
+- 快捷聊天打开时任务、审批和 Ask User 活动继续保留；关闭后恢复原通知，不改变其已读、忽略或处理状态。
+- 常用项目尚无会话时沿用现有项目会话准备链路，准备完成后自动变为可聊天状态。
+
 ## 文件落点
 
 ```text
@@ -299,6 +312,7 @@ Sources/ChatOSApp/Features/Pet/
   PetOverlayView.swift
   PetPreferencesStore.swift
   PetSettingsView.swift
+  PetQuickChatView.swift
   PetNavigationRequest.swift
 
 Tests/
@@ -383,6 +397,14 @@ Rust backend:
 - [x] 执行组只作为任务容器，不再生成“执行计划正在运行”这类伪任务；悬浮框从任务图节点读取真实任务名与状态。
 - [x] 任务流程图总状态同样以节点当前状态优先；节点已阻塞/取消时，旧的运行记录和执行组 metadata 不再显示为运行中。
 
+### 阶段 H：常用项目快捷聊天
+
+- [x] 项目设置增加常用项目开关并本地持久化。
+- [x] 宠物单击与拖动手势分流，拖动不打开快捷聊天。
+- [x] 快捷列表固定包含“叽咕狸”，并追加当前工作区的常用项目。
+- [x] 复用主会话 ViewModel 展示最近消息、Realtime 更新并直接发送。
+- [x] 快捷聊天与任务、审批、Ask User 通知状态隔离，关闭后恢复原通知。
+
 ## 测试要求
 
 ### ChatOSCore
@@ -415,6 +437,9 @@ Rust backend:
 - 气泡不会在透明区域吞掉其他应用点击。
 - 显示器变化后位置仍在 visibleFrame 内。
 - 点击事件产生正确导航请求。
+- 单击宠物打开快捷列表，拖动宠物不打开列表。
+- 常用项目开关持久化，工作区刷新后列表顺序和内容保持正确。
+- 快捷会话发送后主聊天页能看到同一条消息，反向 Realtime 更新也能进入快捷会话。
 
 ## 验收标准
 
@@ -428,3 +453,5 @@ Rust backend:
 - Realtime 重连后能恢复真实 pending 状态。
 - 宠物窗口不要求辅助功能或屏幕录制权限。
 - 宠物关闭时 ChatOS 主工作区功能不受影响。
+- “叽咕狸”始终作为快捷聊天第一项；常用项目按项目列表顺序平级展示。
+- 快捷聊天打开期间到达的任务、审批和 Ask User 不丢失，关闭聊天后可继续处理。
